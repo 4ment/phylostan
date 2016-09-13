@@ -110,7 +110,7 @@ else:
     sm = pickle.load(open(binary, 'rb'))
 
 if arg.algorithm == 'vb':
-    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path, diagnostics_file=sample_path+".diag", algorithm=arg.variational)
+    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path, diagnostic_file=sample_path+".diag", algorithm=arg.variational)
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper())
 print(fit)
