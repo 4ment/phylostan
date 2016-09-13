@@ -15,8 +15,9 @@ A custom version of pystan is also required, available from:
 
 To build:
 
+```
   git clone https://github.com/koadman/pystan
   cd pystan
   git submodule update --init --recursive
   python setup.py install
-
+```
