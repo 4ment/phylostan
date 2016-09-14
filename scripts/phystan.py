@@ -9,6 +9,21 @@ from dendropy import Tree, DnaCharacterMatrix
 import os
 import phylo
 
+#
+# reads a Stan ADVI diagnostic file to extract the best ELBO
+#
+def get_elbo(diag_filename):
+    diag_file = open(diag_filename, "r")
+    best_elbo=1
+    for line in diag_file:
+        if line.startswith("#"):
+            continue
+        line.rstrip("\n")
+        d = line.split(",")
+        d[2] = float(d[2])
+        if best_elbo > 0 or best_elbo < d[2]:
+            best_elbo = d[2]
+    return best_elbo
 
 
 parser = argparse.ArgumentParser()
@@ -111,6 +126,8 @@ else:
 
 if arg.algorithm == 'vb':
     fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path, diagnostic_file=sample_path+".diag", algorithm=arg.variational)
+    elbo = get_elbo(sample_path+".diag")
+    print "Marginal likelihood lower bound is " + str(elbo)
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper())
 print(fit)
