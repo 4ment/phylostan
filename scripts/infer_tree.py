@@ -87,14 +87,15 @@ tipdata = phylo.get_dna_leaves_partials(dna)
 
 
 # make the initial particles with all taxa from the first two sequences
-n0 = dendropy.datamodel.treemodel.Node(label="0",edge_length=1)
-n1 = dendropy.datamodel.treemodel.Node(label="1",edge_length=1)
+n0 = dendropy.datamodel.treemodel.Node(label="s0",edge_length=1)
+n1 = dendropy.datamodel.treemodel.Node(label="s1",edge_length=1)
+n0.taxon = dendropy.datamodel.taxonmodel.Taxon(label="s0")
+n1.taxon = dendropy.datamodel.taxonmodel.Taxon(label="s1")
 
 t0n2 = dendropy.datamodel.treemodel.Node(label="n0",edge_length=1)
 t0n2.add_child(n0)
 t0n2.add_child(n1)
 t0 = Tree(seed_node=t0n2)
-t0.calc_node_root_distances()
 
 # stores the current set of tree topology particles
 psize=1000
@@ -105,8 +106,9 @@ for i in range(2,sequence_count):
     new_particles = list()
     for p in particles:
         pp = dendropy.Tree(p)
-        ni = dendropy.datamodel.treemodel.Node(label=str(i),edge_length=1)
-        # pick an node at random
+        ni = dendropy.datamodel.treemodel.Node(label="s" + str(i),edge_length=1)
+        ni.taxon = dendropy.datamodel.taxonmodel.Taxon(label="s" + str(i))
+        # pick a node at random
         nlist = pp.nodes()
         n = nlist[numpy.random.randint(len(nlist))]
         # make a new internal node with n and ni as its child
@@ -119,18 +121,19 @@ for i in range(2,sequence_count):
             parent.add_child(newnode)
         else:
             newnode.add_child(n)
-            pp.reroot_at_node(newnode)
+            pp = dendropy.Tree(seed_node=newnode)
         new_particles.append(pp)
 
     # calculate ELBOs for each unique topology
     cur_trees = dict()
     for p in new_particles:
         cur_trees[p.as_string("newick")]=p
-    particle_weights = dict()
+    tree_weights = [0]*len(cur_trees)
 
     print "There are " + str(len(cur_trees)) + " unique trees to evaluate\n"
 
-    for treestring in cur_trees:
+    for tI,treestring in enumerate(cur_trees):        
+        print "Evaluating " + treestring
         tree = cur_trees[treestring]
         for node in tree.postorder_node_iter():
             node.index = -1
@@ -143,7 +146,7 @@ for i in range(2,sequence_count):
                 s += 1
             else:
                 for idx, name in enumerate(dna):
-                    if str(idx) == str(node.label):
+                    if "s" + str(idx) == node.label:
                         node.index = idx + 1
                         break
 
@@ -185,8 +188,10 @@ for i in range(2,sequence_count):
         print "elbo is " + str(elbo)
 
         # store the ELBO for this tree
-        particle_weights[tree] = elbo
+        # tree_weights[tI] = elbo
+        tree_weights[tI] = 1.0 / float(len(tree_weights))  #Hack: setting this to uniform til weight normalisation & forward/back proposal densities are implemented
 
     # now resample the particles based on weight
     print "Resampling particles"
+    particles = numpy.random.choice(cur_trees.values(), size=psize, p=tree_weights)
 
