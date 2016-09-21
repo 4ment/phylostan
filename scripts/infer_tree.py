@@ -98,7 +98,8 @@ t0n2.add_child(n1)
 t0 = Tree(seed_node=t0n2)
 
 # stores the current set of tree topology particles
-psize=1000
+psize = 1000
+elbo_tries = 3
 particles = [t0]*psize
 
 for i in range(2,sequence_count):
@@ -125,6 +126,7 @@ for i in range(2,sequence_count):
         new_particles.append(pp)
 
     # calculate ELBOs for each unique topology
+    # this is an awful hack to get a set of unique topologies. Need to switch to bipartition sets or something equivalent.
     cur_trees = dict()
     for p in new_particles:
         cur_trees[p.as_string("newick")]=p
@@ -182,16 +184,40 @@ for i in range(2,sequence_count):
         elif arg.model == 'HKY':
             data['frequencies_alpha'] = [1, 1, 1, 1]
 
-
-        fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path, diagnostic_file=sample_path+".diag", algorithm="meanfield")
-        elbo = get_elbo(sample_path+".diag")
-        print "elbo is " + str(elbo)
+        best_elbo = 1
+        for etries in range(0,elbo_tries):
+            try:
+                fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=2000, sample_file=sample_path, diagnostic_file=sample_path+".diag", algorithm="meanfield")
+                elbo = get_elbo(sample_path+".diag")
+                if best_elbo == 1: best_elbo = elbo
+                best_elbo = max(elbo, best_elbo)
+            except:
+                print "There was an error running Stan"
 
         # store the ELBO for this tree
-        # tree_weights[tI] = elbo
-        tree_weights[tI] = 1.0 / float(len(tree_weights))  #Hack: setting this to uniform til weight normalisation & forward/back proposal densities are implemented
+        print "elbo for " + treestring + " is " + str(best_elbo)
+        tree_weights[tI] = best_elbo
+
+
+    print "Trees and ELBOs:"
+    for tI,treestring in enumerate(cur_trees):        
+        print str(tree_weights[tI]) + "\t" + treestring.rstrip("\n")
 
     # now resample the particles based on weight
+    resample_threshold = 20 # discard particles that are this many log units worse than the best
     print "Resampling particles"
+    max_elbo = numpy.amax(tree_weights)
+    tree_weights = numpy.add(tree_weights,-max_elbo + 20)
+    tree_weights.clip(min=0, out=tree_weights)
+    tree_weights = map(numpy.exp,tree_weights)    
+    tree_weights = numpy.divide(tree_weights, numpy.sum(tree_weights))
+    # FIXME: this does not incorporate proposal densities
     particles = numpy.random.choice(cur_trees.values(), size=psize, p=tree_weights)
 
+    new_trees = set()
+    for p in particles:
+        new_trees.add(p.as_string("newick"))
+    print "Resampling gives " + str(len(new_trees)) + " topologies"
+    print "Remaining candidate trees:\n"
+    print "".join(new_trees)
+ 
