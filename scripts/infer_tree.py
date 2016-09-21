@@ -104,6 +104,10 @@ particles = [t0]*psize
 
 for i in range(2,sequence_count):
     # propose the addition of sequence i to particle p
+    #
+    # FIXME: this proposal method may be ok for unrooted trees but it does
+    # not work for the coalescent models in Stan. Need to make uniform proposals over
+    # labeled histories instead. pick an epoch then pick an active lineage?
     new_particles = list()
     for p in particles:
         pp = dendropy.Tree(p)
