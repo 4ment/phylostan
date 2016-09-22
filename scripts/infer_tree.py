@@ -27,7 +27,7 @@ def get_elbo(diag_filename):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-m', '--model', choices=['JC69', 'K80', 'HKY', 'GTR'], default='GTR',
+parser.add_argument('-m', '--model', choices=['JC69unif','JC69', 'K80', 'HKY', 'GTR'], default='JC69unif',
                     help="""Substitution model [default: %(default)d]""")
 parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=True, help="""Sequence file""")
 parser.add_argument('-o', '--output', required=False, help="""Output file""")
@@ -59,6 +59,8 @@ elif arg.model == 'K80':
     source = 'K80-coalescent.stan'
 elif arg.model == 'JC69':
     source = 'JC69-coalescent.stan'
+elif arg.model == 'JC69unif':
+    source = 'JC69-uniform.stan'
 
 source_file = os.path.join(my_path, '..', 'src', source)
 
@@ -225,3 +227,8 @@ for i in range(2,sequence_count):
     print "Remaining candidate trees:\n"
     print "".join(new_trees)
  
+
+# At this point we have a collection of complete topologies
+# This needs to be turned into a collection of tree & parameter samples
+# One possibility would be to generate samples for each topology with VB, one sample for each particle with that topology
+
