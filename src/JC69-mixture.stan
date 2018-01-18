@@ -34,7 +34,6 @@ model {
     vector[alphalen] node[T,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes
     matrix[alphalen,alphalen] fttm[T,bcount]; // finite-time transition matrices for each branch, plus zero-length root branch
     real ps[T];
-    //real log_theta[T] = log(theta);
 
     // set some branch length priors
     for( t in 1:T){
@@ -77,7 +76,6 @@ model {
     // calculate tree likelihood for the topology encoded in peel
     for( i in 1:L ) {
         for( t in 1:T ) {
-            ps[t] = log(theta[t]);
             for( n in 1:(S-1) ) {
                 node[t,peel[t,n,3],i] = (fttm[t,n*2-1]*node[t,peel[t,n,1],i]) .* (fttm[t,n*2]*node[t,peel[t,n,2],i]);
             }
@@ -85,8 +83,8 @@ model {
             node[t,2*S,i] = node[t,peel[t,S-1,3],i] / alphalen;
 
             // add the site log likelihood
-            ps[t] = ps[t] + log(sum(node[t,2*S,i]))*weights[i];
+            ps[t] = log(theta[t]) + log(sum(node[t,2*S,i]));
         }
-        target += log_sum_exp(ps);
+        target += log_sum_exp(ps)*weights[i];
     }
 }

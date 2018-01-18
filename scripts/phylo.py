@@ -71,6 +71,17 @@ def get_peeling_order(tree):
     return peeling
 
 
+def get_peeling_orders(trees):
+    peelings = numpy.zeros((len(trees), len(trees[0].leaf_nodes())-1, 3), dtype=numpy.int)
+
+    for i, tree in enumerate(trees):
+        j = 0
+        for node in tree.postorder_node_iter():
+            if not node.is_leaf():
+                peelings[i][j][:] = [x.index for x in node.child_node_iter()] + [node.index]
+                j += 1
+    return peelings
+
 def get_dna_leaves_partials(alignment):
     tipdata = numpy.zeros((len(alignment), alignment.sequence_size, 4), dtype=numpy.int)
     dna_map = {'a': [1, 0, 0, 0], 'c': [0, 1, 0, 0], 'g': [0, 0, 1, 0], 't': [0, 0, 0, 1]}
@@ -83,6 +94,43 @@ def get_dna_leaves_partials(alignment):
     return tipdata
 
 
+def get_dna_leaves_partials_compressed(alignment):
+    weights = []
+    keep = [True] * alignment.sequence_size
+
+    patterns = {}
+    indexes = {}
+    for i in range(alignment.sequence_size):
+        pat = ''
+        for name in alignment:
+            pat += str(alignment[name][i])
+
+        if pat in patterns:
+            keep[i] = False
+            patterns[pat] += 1
+        else:
+            patterns[pat] = 1
+            indexes[i] = pat
+
+    for i in range(alignment.sequence_size):
+        if keep[i]:
+            weights.append(patterns[indexes[i]])
+
+    tipdata = numpy.zeros((len(alignment), len(patterns.keys()), 4), dtype=numpy.int)
+
+    dna_map = {'a': [1, 0, 0, 0], 'c': [0, 1, 0, 0], 'g': [0, 0, 1, 0], 't': [0, 0, 0, 1]}
+
+    s = 0
+    for name in alignment:
+        k = 0
+        for i, c in enumerate(alignment[name].symbols_as_string()):
+            if keep[i]:
+                tipdata[s][k][:] = dna_map.get(c.lower(), [1, 1, 1, 1])
+                k += 1
+        s += 1
+    return tipdata, weights
+
+
 def initialize_dna_partials(alignment):
     partials = numpy.zeros((2 * len(alignment) - 1, alignment.sequence_size, 4))
     dna_map = {'a': [1, 0, 0, 0], 'c': [0, 1, 0, 0], 'g': [0, 0, 1, 0], 't': [0, 0, 0, 1]}
@@ -93,6 +141,22 @@ def initialize_dna_partials(alignment):
             partials[s][i][:] = dna_map.get(c.lower(), [1, 1, 1, 1])
         s += 1
     return partials
+
+
+# def compress_alignment(alignment):
+#     pat = ''
+#     patterns = {}
+#     for i in range(sequence_size):
+#         for j in range(len(alignment)):
+#             pat += str(alignment[j][i])
+#         if pat in patterns:
+#             patterns[pat] += 1
+#         else:
+#             patterns[pat] = 1
+#
+#     new_aln = dendropy.DnaCharacterMatrix.from_dict({})
+#     for idx, name in enumerate(alignment):
+#         new_aln[]
 
 
 def setup_indexes(tree, dna):

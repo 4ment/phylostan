@@ -276,7 +276,7 @@ if arg.algorithm == 'vb':
     #print "Marginal likelihood lower bound is " + str(elbo)
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper())
-print(fit)
+#print(fit)
 
 # with open(arg.input.name+'.info', 'w') as fp:
 #     fp.write(str(fit))

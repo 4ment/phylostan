@@ -112,7 +112,6 @@ model {
     for( i in 1:L ) {
         counter = 1;
         for( t in 1:T ) {
-            ps[t] = log(theta[t]);
             for( n in 1:(S-2) ) {
                 node[t,peel[t,n,3],i] = (fttm[indexes[counter]]*node[t,peel[t,n,1],i]) .* (fttm[indexes[counter+1]]*node[t,peel[t,n,2],i]);
                 counter  = counter + 2;
@@ -123,9 +122,9 @@ model {
             node[t,2*S,i] = node[t,peel[t,S-1,3],i] / alphalen;
 
             // add the site log likelihood
-            ps[t] = ps[t] + log(sum(node[t,2*S,i]))*weights[i];
+            ps[t] = log(theta[t]) + log(sum(node[t,2*S,i]));
         }
-        target += log_sum_exp(ps);
+        target += log_sum_exp(ps)*weights[i];
     }
 
 }

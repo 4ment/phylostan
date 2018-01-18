@@ -70,9 +70,8 @@ model {
     taus ~ coalescent(theta);
     
     freqs ~ dirichlet(frequencies_alpha);
-	
+
 	rates ~ dirichlet(rates_alpha);
-	//rates ~ gamma(0.05,10);
 	
 
 	R[2,1] = rates[1];
