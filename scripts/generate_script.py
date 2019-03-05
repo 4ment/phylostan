@@ -135,26 +135,29 @@ def joacobian(heterochronous=False):
 def JC69(C=1, invariant=False):
 	jc69_function_str = '''
 	matrix[] calculate_jc69_p_matrices(vector blens{0}){{
+		{1}
 		int bcount = rows(blens);
-		matrix[4,4] pmats[bcount{1}]; // probability matrices
-		{2}
+		matrix[4,4] pmats[bcount{2}]; // probability matrices
+		int index = 1;
+		real d;
+		{3}
 			for( b in 1:bcount ) {{
+				pmats[index] = rep_matrix(0.25 - 0.25*exp(-blens[b]{4}/0.75), 4, 4);
+				d = 0.25 + 0.75*exp(-blens[b]{4}/0.75);
 				for( i in 1:4 ) {{
-					for( j in 1:4 ) {{
-						pmats[b][i,j] = 0.25 - 0.25*exp(-blens[b]{3}/0.75);
-					}}
-					pmats[b][i,i] = 0.25 + 0.75*exp(-blens[b]{3}/0.75);
+					pmats[index][i,i] = d;
 				}}
+				index += 1;
 			}}
-		{4}
+		{5}
 		return pmats;
 	}}
 	'''
 
-	if C == 1:
-		return jc69_function_str.format('', '', '', '', '')
+	if C > 1 or invariant:
+		return jc69_function_str.format(', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}')
 	else:
-		return jc69_function_str.format(', int C', '*C', 'for(c in 1:C){', '*rs[c]', '}')
+		return jc69_function_str.format(*['']*6)
 
 
 def GTR(C=1, invariant=False):
@@ -219,10 +222,8 @@ one_on_X = """
 	}
 """
 
-model_calculate_unconstrained_logP = """
-	// one branch below to the root has a branch length equal to 0 (fake rooting)
-    pmats[bcount] = diag_matrix(rep_vector(1.0,4)); 
-    
+def likelihood(mixture, clock=True):
+	init_tip_partials = """
 	// copy tip data into node probability vector
 	for( n in 1:S ) {
 		for( i in 1:L ) {
@@ -231,46 +232,8 @@ model_calculate_unconstrained_logP = """
 			}
 		}
 	}
-	
-	// calculate tree likelihood
-	for( i in 1:L ) {
-		for( n in 1:(S-1) ) {
-			partials[peel[n,3],i] = (pmats[peel[n,1]]*partials[peel[n,1],i]) .* (pmats[peel[n,2]]*partials[peel[n,2],i]);
-		}
-		
-		for(j in 1:4){
-			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
-		}
-		// add the site log likelihood
-		target += log(sum(partials[2*S,i]))*weights[i];
-	}
 """
-
-model_calculate_logP = """
-	// copy tip data into node probability vector
-	for( n in 1:S ) {
-		for( i in 1:L ) {
-			for( a in 1:4 ) {
-				partials[n,i][a] = tipdata[n,i,a];
-			}
-		}
-	}
-
-	// calculate tree likelihood for the topology encoded in peel
-	for( i in 1:L ) {
-		for( n in 1:(S-1) ) {
-			partials[peel[n,3],i] = (pmats[peel[n,1]]*partials[peel[n,1],i]) .* (pmats[peel[n,2]]*partials[peel[n,2],i]);
-		}
-
-		for(j in 1:4){
-			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
-		}
-		// add the site log likelihood
-		target += log(sum(partials[2*S,i]))*weights[i];
-	}
-"""
-
-model_calculate_mixture_logP = """
+	init_tip_partials_mixture="""
 	// copy tip data into node probability vector
 	for( n in 1:S ) {
 		for( i in 1:L ) {
@@ -281,8 +244,23 @@ model_calculate_mixture_logP = """
 			}
 		}
 	}
-	
-	// calculate tree likelihood for the topology encoded in peel
+"""
+	model_calculate_logP = """
+	// calculate tree likelihood
+	for( i in 1:L ) {
+		for( n in 1:(S-1) ) {
+			partials[peel[n,3],i] = (pmats[peel[n,1]]*partials[peel[n,1],i]) .* (pmats[peel[n,2]]*partials[peel[n,2],i]);
+		}
+
+		for(j in 1:4){
+			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
+		}
+		// add the site log likelihood
+		target += log(sum(partials[2*S,i]))*weights[i];
+	}
+"""
+	model_calculate_mixture_logP = """
+	// calculate tree likelihood
 	for( i in 1:L ) {
 		for( n in 1:(S-1) ) {
 			for(c in 1:C){
@@ -296,9 +274,55 @@ model_calculate_mixture_logP = """
 		target += log(sum(probs))*weights[i];
 	}
 """
+	model_calculate_unconstrained_logP = """
+	// calculate tree likelihood
+	for( i in 1:L ) {
+		for( n in 1:(S-2) ) {
+			partials[peel[n,3],i] = (pmats[peel[n,1]]*partials[peel[n,1],i]) .* (pmats[peel[n,2]]*partials[peel[n,2],i]);
+		}
+		partials[peel[S-1,3],i] = (pmats[peel[S-1,1]]*partials[peel[S-1,1],i]) .* partials[peel[S-1,2],i];
+
+		for(j in 1:4){
+			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
+		}
+		// add the site log likelihood
+		target += log(sum(partials[2*S,i]))*weights[i];
+	}
+"""
+	model_calculate_unconstrained_mixture_logP = """
+	// calculate tree likelihood
+	for( i in 1:L ) {
+		for( n in 1:(S-2) ) {
+			for(c in 1:C){
+				partials[c,peel[n,3],i] = (pmats[peel[n,1]+(c-1)*bcount]*partials[c,peel[n,1],i]) .* (pmats[peel[n,2]+(c-1)*bcount]*partials[c,peel[n,2],i]);
+			}
+		}
+		for(c in 1:C){
+			partials[c,peel[S-1,3],i] = (pmats[peel[S-1,1]+(c-1)*bcount]*partials[c,peel[S-1,1],i]) .* partials[c,peel[S-1,2],i];
+			probs[c] = ps[c] * sum(partials[c,peel[S-1,3],i] .* freqs);
+		}
+		// add the site log likelihood
+		target += log(sum(probs))*weights[i];
+	}
+"""
+
+	if not mixture:
+		model = init_tip_partials
+		if clock:
+			model += '\n' + model_calculate_logP
+		else:
+			model += '\n' + model_calculate_unconstrained_logP
+	else:
+		model = init_tip_partials_mixture
+		if clock:
+			model += '\n' + model_calculate_mixture_logP
+		else:
+			model += '\n' + model_calculate_unconstrained_mixture_logP
+
+	return model
 
 
-def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate_rate=True, categories=1, clock='strict', invariant=False, **kwargs):
+def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate_rate=False, categories=1, clock=None, invariant=False, **kwargs):
 	functions_block = []
 
 	data_block = []
@@ -318,12 +342,14 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 	data_block.append('real<lower=0,upper=1> tipdata[S,L,4]; // alignment as partials')
 	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
 	data_block.append('real weights[L];')
-	if coalescent is not None:
+
+	if clock is None:
+		transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
+	else:
 		data_block.append('int map[2*S-1,2];                     // list of node in preorder [node,parent]')
+		transformed_data_declarations.append('int bcount = 2*S-2; // number of branches')
 
-	transformed_data_declarations.append('int bcount; // number of branches')
-	transformed_data_block.append('bcount = 2*S-2;')
-
+	# Site model
 	if invariant or categories > 1:
 		model_block_declarations.append('real probs[C];')
 		model_block_declarations.append('vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
@@ -361,7 +387,8 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 	elif invariant and categories > 1:
 		raise ValueError('Cannot use proportion of invariant and discrete rate heterogeneity yet.')
 
-	if coalescent is not None:
+	# Clock model
+	if clock is not None:
 		model_block_declarations.append('vector [bcount] blens; // branch lengths')
 
 		transformed_data_declarations.append('int pCount; // number of proportions')
@@ -390,6 +417,7 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		
 		model_block.append(heights_to_blens(heterochronous))
 
+		# Coalescent
 		if coalescent == 'constant':
 			functions_block.append(one_on_X)
 			parameters_block.append('real <lower=0> theta;')
@@ -400,9 +428,10 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 			else:
 				model_priors.append('heights ~ constant_coalescent(theta, map);')
 	else:
-		parameters_block.append('vector<lower=0,upper=10> [bcount-1] blens; // branch lengths')
+		parameters_block.append('vector<lower=0,upper=10> [bcount] blens; // branch lengths')
 		model_priors.append('blens ~ exponential(10);')
 
+	# Substitution model
 	if substitution == 'GTR':
 		data_block.append('vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies')
 		data_block.append('vector<lower=0>[6] rates_alpha;       // parameters of the prior on rates')
@@ -419,20 +448,19 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		else:
 			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens);')
 	elif substitution == 'JC69':
-		model_block_declarations.append('real freqs[4];')
-		model_block.append('freqs = rep_array(0.25,4);')
+		model_block_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
 		functions_block.append(JC69(categories, invariant))
 		if invariant or categories > 1:
-			model_block.append('pmats = calculate_jc69_p_matrices(blens, rs, C);')
+			model_block.append('pmats = calculate_jc69_p_matrices(blens, rs);')
 		else:
 			model_block.append('pmats = calculate_jc69_p_matrices(blens);')
-
-	if invariant or categories > 1:
-		model_block.append(model_calculate_mixture_logP)
 	else:
-		model_block.append(model_calculate_logP)
+		raise ValueError('Supports JC69 and GTR only.')
 
-	if coalescent is not None:
+	# Tree likelihood
+	model_block.append(likelihood(categories > 1 or invariant, clock is not None))
+
+	if clock is not None:
 		model_block.append(joacobian(heterochronous))
 
 	script = ''
