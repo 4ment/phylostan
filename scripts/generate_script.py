@@ -69,6 +69,93 @@ def constant_coalescent(heterochronous=False):
 		return constant_coalescent_str.format('', '0')
 
 
+def skyride_coalescent(heterochronous):
+	skyride_coalescent_str = """
+	real skyride_coalescent_log(real[] heights, vector pop, int[,] map{0}){{
+		int S = size(heights)+1; // number of leaves from the number of internal nodes
+		int nodeCount = size(heights) + S;
+
+		real logP = 0.0;
+		int index = 1;
+		real lineageCount = 0.0;
+
+		int indices[nodeCount];
+		int childCounts[nodeCount];
+		real times[nodeCount];
+		real start;
+		real finish;
+		real interval;
+
+		times[map[1,1]] = heights[map[1,1]-S];
+		for( i in 1:nodeCount ){{
+			// internal node: transform
+			if(map[i,1] > S){{
+				times[map[i,1]] = heights[map[i,1]-S];
+				childCounts[map[i,1]] = 2;
+			}}
+			else{{
+				times[map[i,1]] = {1};
+				childCounts[map[i,1]] = 0;
+			}}
+		}}
+
+		// calculate intervals
+		indices = sort_indices_asc(times);
+
+		// first tip
+		start = times[indices[1]];
+
+		for (i in 1:nodeCount) {{
+			finish = times[indices[i]];
+
+			interval = finish - start;
+			// consecutive sampling events
+			if(interval != 0.0){{
+				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/exp(pop[index]);
+				if (childCounts[indices[i]] != 0) {{
+					logP -= pop[index];
+				}}
+				index += 1;
+			}}
+
+			// sampling event
+			if (childCounts[indices[i]] == 0) {{
+				lineageCount += 1.0;
+			}}
+			// coalescent event
+			else {{
+				lineageCount -= 1.0;
+			}}
+
+			start = finish;
+		}}
+
+		return logP;
+	}}
+"""
+
+	if heterochronous:
+		return skyride_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
+	else:
+		return skyride_coalescent_str.format('', '0')
+
+
+def GMRF():
+	gmrf_logP = """
+	// Not time aware
+	real gmrf_log(vector logPopSize, real precision){
+		int N = rows(logPopSize);
+		real realN = N;
+		real s = 0;
+		for (i in 2:N){
+			s += pow(logPopSize[i-1]-logPopSize[i], 2.0);
+		}
+		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
+	}
+"""
+	return gmrf_logP
+
+
 def heights_to_blens(heterochronous=False):
 	model_heights_to_blens = """
 	// populate blens from heights array in preorder
@@ -427,6 +514,22 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 				model_priors.append('heights ~ constant_coalescent(theta, map, lowers);')
 			else:
 				model_priors.append('heights ~ constant_coalescent(theta, map);')
+		elif coalescent == 'skyride':
+			functions_block.append(skyride_coalescent(heterochronous))
+			functions_block.append(GMRF())
+
+			data_block.append('int I; // number of intervals')
+
+			parameters_block.append('vector[I] thetas; // log space')
+			parameters_block.append('real<lower=0> tau;')
+
+			if heterochronous:
+				model_priors.append('heights ~ skyride_coalescent(thetas, map, lowers);')
+			else:
+				model_priors.append('heights ~ skyride_coalescent(thetas, map);')
+
+			model_priors.append('thetas ~ gmrf(tau);')
+			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
 		parameters_block.append('vector<lower=0,upper=10> [bcount] blens; // branch lengths')
 		model_priors.append('blens ~ exponential(10);')
