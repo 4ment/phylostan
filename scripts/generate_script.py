@@ -409,7 +409,7 @@ def likelihood(mixture, clock=True):
 	return model
 
 
-def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate_rate=False, categories=1, clock=None, invariant=False, **kwargs):
+def get_model(params):
 	functions_block = []
 
 	data_block = []
@@ -430,14 +430,14 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
 	data_block.append('real weights[L];')
 
-	if clock is None:
+	if params.clock is None:
 		transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
 	else:
 		data_block.append('int map[2*S-1,2];                     // list of node in preorder [node,parent]')
 		transformed_data_declarations.append('int bcount = 2*S-2; // number of branches')
 
 	# Site model
-	if invariant or categories > 1:
+	if params.invariant or params.categories > 1:
 		model_block_declarations.append('real probs[C];')
 		model_block_declarations.append('vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
 		model_block_declarations.append('matrix[4,4] pmats[bcount*C]; // finite-time transition matrices for each branch')
@@ -445,7 +445,7 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		model_block_declarations.append('vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
 		model_block_declarations.append('matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch')
 		
-	if categories > 1 and not invariant:
+	if params.categories > 1 and not params.invariant:
 		data_block.append('int C;')
 		
 		parameters_block.append('simplex[C]  ps;')
@@ -457,7 +457,7 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		transformed_parameters_block.append('constraint = ps .* rate_unscaled; // not actually a simplex yet')
 		transformed_parameters_block.append('rs = rate_unscaled / sum(constraint);')
 		transformed_parameters_block.append('constraint /= sum(constraint); // is now a simplex that equals p .* x ')
-	elif invariant and categories == 1:
+	elif params.invariant and params.categories == 1:
 		transformed_data_declarations.append('int C = 2;')
 		
 		parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
@@ -471,51 +471,50 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		transformed_parameters_block.append('rs[2] = 1.0/(1.0 - pinv);')
 		
 		model_priors.append('pinv ~ uniform(0.0,1.0);')
-	elif invariant and categories > 1:
+	elif params.invariant and params.categories > 1:
 		raise ValueError('Cannot use proportion of invariant and discrete rate heterogeneity yet.')
 
 	# Clock model
-	if clock is not None:
+	if params.clock is not None:
 		model_block_declarations.append('vector [bcount] blens; // branch lengths')
 
-		transformed_data_declarations.append('int pCount; // number of proportions')
-		transformed_data_block.append('pCount = S-2;')
+		transformed_data_declarations.append('int pCount = S-2; // number of proportions')
 
 		parameters_block.append('real <lower=0,upper=1> props[pCount]; // proportions')
 		transformed_parameters_declarations.append('real <lower=0> heights[S-1];')
 
-		if estimate_rate:
-			if clock == 'strict':
+		if params.estimate_rate:
+			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
 				#data_block.append('real <lower=0> meanRate;')
 				model_priors.append('rate ~ exponential(1.0/1000);')
 		else:
 			data_block.append('real <lower=0> rate;')
 
-		functions_block.append(transform_heights(heterochronous))
-		if heterochronous:
+		functions_block.append(transform_heights(params.heterochronous))
+		data_block.append('real lower_root;')
+		if params.heterochronous:
 			data_block.append('real lowers[2*S-1]; // list of lower bounds for each internal node (for reparametrization)')
-			data_block.append('real lower_root;')
 			parameters_block.append('real <lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map, lowers);')
 		else:
-			parameters_block.append('real height; // root height')
+			parameters_block.append('real<lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map);')
 		
-		model_block.append(heights_to_blens(heterochronous))
+		model_block.append(heights_to_blens(params.heterochronous))
 
 		# Coalescent
-		if coalescent == 'constant':
+		if params.coalescent == 'constant':
 			functions_block.append(one_on_X)
 			parameters_block.append('real <lower=0> theta;')
 			model_priors.append('theta ~ oneOnX();')
-			functions_block.append(constant_coalescent(heterochronous))
-			if heterochronous:
+			functions_block.append(constant_coalescent(params.heterochronous))
+			if params.heterochronous:
 				model_priors.append('heights ~ constant_coalescent(theta, map, lowers);')
 			else:
 				model_priors.append('heights ~ constant_coalescent(theta, map);')
-		elif coalescent == 'skyride':
-			functions_block.append(skyride_coalescent(heterochronous))
+		elif params.coalescent == 'skyride':
+			functions_block.append(skyride_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
 
 			data_block.append('int I; // number of intervals')
@@ -523,7 +522,7 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 			parameters_block.append('vector[I] thetas; // log space')
 			parameters_block.append('real<lower=0> tau;')
 
-			if heterochronous:
+			if params.heterochronous:
 				model_priors.append('heights ~ skyride_coalescent(thetas, map, lowers);')
 			else:
 				model_priors.append('heights ~ skyride_coalescent(thetas, map);')
@@ -535,7 +534,7 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		model_priors.append('blens ~ exponential(10);')
 
 	# Substitution model
-	if substitution == 'GTR':
+	if params.model == 'GTR':
 		data_block.append('vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies')
 		data_block.append('vector<lower=0>[6] rates_alpha;       // parameters of the prior on rates')
 
@@ -545,15 +544,15 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		model_priors.append('rates ~ dirichlet(rates_alpha);')
 		model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
 
-		functions_block.append(GTR(categories, invariant))
-		if invariant or categories > 1:
+		functions_block.append(GTR(params.categories, params.invariant))
+		if params.invariant or params.categories > 1:
 			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens, rs);')
 		else:
 			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens);')
-	elif substitution == 'JC69':
+	elif params.model == 'JC69':
 		model_block_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
-		functions_block.append(JC69(categories, invariant))
-		if invariant or categories > 1:
+		functions_block.append(JC69(params.categories, params.invariant))
+		if params.invariant or params.categories > 1:
 			model_block.append('pmats = calculate_jc69_p_matrices(blens, rs);')
 		else:
 			model_block.append('pmats = calculate_jc69_p_matrices(blens);')
@@ -561,10 +560,10 @@ def get_model(substitution='GTR', coalescent=None, heterochronous=True, estimate
 		raise ValueError('Supports JC69 and GTR only.')
 
 	# Tree likelihood
-	model_block.append(likelihood(categories > 1 or invariant, clock is not None))
+	model_block.append(likelihood(params.categories > 1 or params.invariant, params.clock is not None))
 
-	if clock is not None:
-		model_block.append(joacobian(heterochronous))
+	if params.clock is not None:
+		model_block.append(joacobian(params.heterochronous))
 
 	script = ''
 

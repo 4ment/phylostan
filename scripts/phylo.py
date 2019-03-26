@@ -70,6 +70,31 @@ def get_peeling_order(tree):
                 [x.index for x in node.child_node_iter()] + [node.index])
     return peeling
 
+def get_preorder(tree):
+    peeling = []
+    peeling.append([tree.seed_node.index, 0])
+    for node in tree.preorder_node_iter():
+        if node.parent_node is not None:
+            peeling.append([node.index, node.parent_node.index])#, len([n for n in node.child_node_iter()])])
+    return peeling
+
+
+def get_lowers(tree):
+    lowers = [0 for x in tree.postorder_node_iter()]
+    ll = {}
+
+    for node in tree.postorder_node_iter():
+        if node.is_leaf():
+            ll[node] = node.date
+        else:
+            ll[node] = max([ll[x] for x in node.child_node_iter()])
+            #print('{} {} {}'.format(node.index, ll[node], ' '.join([str(x.date) for x in node.child_node_iter()])))
+
+    for node in tree.preorder_node_iter():
+        #print('{} {}'.format(node.index, ll[node], ' '.join([str(x.date) for x in node.child_node_iter()])))
+        lowers[node.index-1] = ll[node]
+    return lowers
+
 
 def get_peeling_orders(trees):
     peelings = numpy.zeros((len(trees), len(trees[0].leaf_nodes())-1, 3), dtype=numpy.int)
@@ -184,6 +209,16 @@ def setup_indexes(tree, dna):
                     node.index = idx
                     break
 
+
+
+def create_adjency_matrix(n):
+    W = numpy.zeros((n, n))
+    for i in range(n-1):
+        W[i+1, i] = -1
+        W[i, i+1] = -1
+    for i in range(n):
+        W[i,i] = -sum(W[i,])
+    return W
 
 def constant_coalescent(times, pop):
     """
