@@ -30,7 +30,7 @@ def get_elbo(diag_filename):
 
 
 parser = argparse.ArgumentParser('Phylogenetics in Stan')
-parser.add_argument('-m', '--model', choices=['JC69', 'K80', 'HKY', 'GTR', 'JC69-GTR', 'JC69-HKY-GTR'], default='GTR',
+parser.add_argument('-m', '--model', choices=['JC69', 'GTR'], default='GTR',
                     help="""Substitution model [default: %(default)s]""")
 parser.add_argument('-a', '--algorithm', choices=['vb', 'nuts', 'hmc'], default='vb',
                     help="""Algorithm [default: %(default)s]""")
@@ -44,8 +44,12 @@ parser.add_argument('-s', '--script', required=False, help="""Stan script file""
 parser.add_argument('-p', '--parameters', required=False, help="""Parameters for Stan script""")
 parser.add_argument('-e', '--eta', required=False, type=float, help="""eta for Stan script""")
 parser.add_argument('-S', '--seed', required=False, type=int, help="""Seed for Stan script""")
-parser.add_argument('-I', '--invariant', required=False, action='store_true', help="""Include a proportion of invariant sites""")
-parser.add_argument('-C', '--categories', metavar='C', required=False, type=int, default=1, help="""Number of categories""")
+parser.add_argument('-I', '--invariant', required=False, action='store_true',
+                    help="""Include a proportion of invariant sites""")
+parser.add_argument('-C', '--categories', metavar='C', required=False, type=int, default=1,
+                    help="""Number of categories""")
+parser.add_argument('--heterogeneity', choices=['weibull', 'discrete'], default='weibull',
+                    help="""Weibull or discrete distribution to model rate heterogeneity across sites""")
 parser.add_argument('--heterochronous', action="store_true",
                     help="""Heterochronous data. Expect a date in the leaf names""")
 parser.add_argument('--lower_root', type=float, default=0.0, help="""Lower bound of the root""")

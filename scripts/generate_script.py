@@ -1,6 +1,42 @@
 #!/usr/bin/env python
 
 
+def get_weibull(invariant=False):
+	weibull_pinv_site_rates = """
+		{
+			real m = 0;
+			real cat = C - 1;
+			real pvar = 1.0 - pinv;
+			rs[1] = 0.0;
+			ps[1] = pinv;
+			for(i in 2:C){
+				rs[i] = pow(-log(1.0 - (2.0*(i-2)+1.0)/(2.0*cat)), 1.0/wshape); // weibull inverse cdf with lambda=1
+				ps[i] = pvar/cat;
+			}
+			m = sum(rs)*pvar/cat;
+			for(i in 2:C){
+				rs[i] /= m;		
+			}
+		}
+"""
+	weibull_site_rates = """
+		{
+			real m = 0;
+			for(i in 1:C){
+				rs[i] = pow(-log(1.0 - (2.0*(i-1)+1.0)/(2.0*C)), 1.0/wshape);
+			}
+			m = sum(rs)/C;
+			for(i in 1:C){
+				rs[i] /= m;		
+			}
+		}
+"""
+	if invariant:
+		return weibull_pinv_site_rates
+	else:
+		return weibull_site_rates
+
+
 def constant_coalescent(heterochronous=False):
 	constant_coalescent_str = """
 	real constant_coalescent_log(real[] heights, real popSize, int[,] map{0}){{
@@ -438,16 +474,25 @@ def get_model(params):
 
 	# Site model
 	if params.invariant or params.categories > 1:
+		data_block.append('int C;')
 		model_block_declarations.append('real probs[C];')
 		model_block_declarations.append('vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
 		model_block_declarations.append('matrix[4,4] pmats[bcount*C]; // finite-time transition matrices for each branch')
 	else:
 		model_block_declarations.append('vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
 		model_block_declarations.append('matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch')
-		
-	if params.categories > 1 and not params.invariant:
-		data_block.append('int C;')
-		
+
+	if params.categories > 1 and params.heterogeneity == 'weibull':
+		transformed_data_declarations.append('vector[C] ps;')
+		transformed_data_block.append('ps = rep_vector(1.0/C, C);')
+
+		parameters_block.append('real<lower=0.1> wshape;')
+
+		transformed_parameters_declarations.append('vector[C] rs;')
+		transformed_parameters_block.append(get_weibull(params.invariant))
+
+		model_priors.append('wshape ~ exponential(1.0);')
+	elif params.categories > 1 and not params.invariant:
 		parameters_block.append('simplex[C]  ps;')
 		parameters_block.append('simplex[C] rate_unscaled;')
 
