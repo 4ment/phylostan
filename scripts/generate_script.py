@@ -176,6 +176,88 @@ def skyride_coalescent(heterochronous):
 		return skyride_coalescent_str.format('', '0')
 
 
+def skygrid_coalescent(heterochronous):
+	skygrid_coalescent_str = """
+	real skygrid_coalescent_log(real[] heights, vector pop, int[,] map, vector grid{0}){{
+		int G = rows(grid);
+		int S = size(heights)+1; // number of leaves from the number of internal nodes
+		int nodeCount = size(heights) + S;
+
+		real logP = 0.0;
+		int index = 1;
+		real lineageCount = 0.0;
+
+		int indices[nodeCount];
+		int childCounts[nodeCount];
+		real times[nodeCount];
+		real start;
+		real finish;
+		real end;
+
+		real popSize;
+		real logPopSize;
+
+		times[map[1,1]] = heights[map[1,1]-S];
+		for( i in 1:nodeCount ){{
+			// internal node: transform
+			if(map[i,1] > S){{
+				times[map[i,1]] = heights[map[i,1]-S];
+				childCounts[map[i,1]] = 2;
+			}}
+			else{{
+				times[map[i,1]] = {1};
+				childCounts[map[i,1]] = 0;
+			}}
+		}}
+
+		// calculate intervals
+		indices = sort_indices_asc(times);
+
+		// first tip
+		start = times[indices[1]];
+		logPopSize = pop[index];
+		popSize = exp(logPopSize);
+
+		for (i in 1:nodeCount) {{
+			finish = times[indices[i]];
+
+			while(index < G && finish > grid[index]){{
+				end = fmin(grid[index], finish);
+				logP -= (end - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
+				start = end;
+
+				if(index < G){{
+					index += 1;
+					logPopSize = pop[index];
+					popSize = exp(logPopSize);
+				}}
+			}}
+			logP -= (finish - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
+			if (childCounts[indices[i]] != 0) {{
+				logP -= logPopSize;
+			}}
+
+			// sampling event
+			if (childCounts[indices[i]] == 0) {{
+				lineageCount += 1.0;
+			}}
+			// coalescent event
+			else {{
+				lineageCount -= 1.0;
+			}}
+
+			start = finish;
+		}}
+		return logP;
+	}}
+"""
+
+	if heterochronous:
+		return skygrid_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
+	else:
+		return skygrid_coalescent_str.format('', '0')
+
+
 def GMRF():
 	gmrf_logP = """
 	// Not time aware
@@ -483,10 +565,12 @@ def get_model(params):
 		model_block_declarations.append('matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch')
 
 	if params.categories > 1 and params.heterogeneity == 'weibull':
-		transformed_data_declarations.append('vector[C] ps;')
-		transformed_data_block.append('ps = rep_vector(1.0/C, C);')
+		transformed_parameters_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
 
 		parameters_block.append('real<lower=0.1> wshape;')
+		if params.invariant:
+			parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
+			model_priors.append('pinv ~ uniform(0.0,1.0);')
 
 		transformed_parameters_declarations.append('vector[C] rs;')
 		transformed_parameters_block.append(get_weibull(params.invariant))
@@ -572,6 +656,22 @@ def get_model(params):
 			else:
 				model_priors.append('heights ~ skyride_coalescent(thetas, map);')
 
+			model_priors.append('thetas ~ gmrf(tau);')
+			model_priors.append('tau ~ gamma(0.001, 0.001);')
+		elif params.coalescent == 'skygrid':
+			functions_block.append(skygrid_coalescent(params.heterochronous))
+			functions_block.append(GMRF())
+
+			data_block.append('int G; // number of grid interval')
+			data_block.append('vector<lower=0>[G] grid;')
+
+			parameters_block.append('vector[G] thetas; // log space')
+			parameters_block.append('real<lower=0> tau;')
+
+			if params.heterochronous:
+				model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid, lowers);')
+			else:
+				model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
 			model_priors.append('thetas ~ gmrf(tau);')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
