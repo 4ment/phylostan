@@ -55,7 +55,6 @@ def constant_coalescent(heterochronous=False):
 		real interval;
 		real logPopSize = log(popSize);
 
-		times[map[1,1]] = heights[map[1,1]-S];
 		for( i in 1:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
@@ -122,7 +121,6 @@ def skyride_coalescent(heterochronous):
 		real finish;
 		real interval;
 
-		times[map[1,1]] = heights[map[1,1]-S];
 		for( i in 1:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
@@ -197,7 +195,6 @@ def skygrid_coalescent(heterochronous):
 		real popSize;
 		real logPopSize;
 
-		times[map[1,1]] = heights[map[1,1]-S];
 		for( i in 1:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
@@ -321,7 +318,7 @@ def transform_heights(heterochronous=False):
 		return transform_str.format('', '', '')
 
 
-def joacobian(heterochronous=False):
+def jacobian(heterochronous=False):
 	log_det_jacobian = """
 	// add log det jacobian
 	for( i in 2:(bcount+1) ){{
@@ -708,7 +705,7 @@ def get_model(params):
 	model_block.append(likelihood(params.categories > 1 or params.invariant, params.clock is not None))
 
 	if params.clock is not None:
-		model_block.append(joacobian(params.heterochronous))
+		model_block.append(jacobian(params.heterochronous))
 
 	script = ''
 

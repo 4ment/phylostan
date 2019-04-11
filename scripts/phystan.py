@@ -70,9 +70,19 @@ if not os.path.lexists(bin_path):
 
 taxa = dendropy.TaxonNamespace()
 
-tree = Tree.get(file=arg.tree, schema="newick", tree_offset=0, taxon_namespace=taxa, preserve_underscores=True)
+tree_format = 'newick'
+with open(arg.tree.name) as fp:
+    if next(fp).upper().startswith('#NEXUS'):
+        tree_format = 'nexus'
 
-dna = DnaCharacterMatrix.get(file=arg.input, schema="nexus", preserve_underscores=True)
+tree = Tree.get(file=arg.tree, schema=tree_format, tree_offset=0, taxon_namespace=taxa, preserve_underscores=True)
+
+dna_format = 'nexus'
+with open(arg.input.name) as fp:
+    if next(fp).startswith('>'):
+        dna_format = 'fasta'
+
+dna = DnaCharacterMatrix.get(file=arg.input, schema=dna_format, preserve_underscores=True)
 alignment_length = dna.sequence_size
 sequence_count = len(dna)
 
