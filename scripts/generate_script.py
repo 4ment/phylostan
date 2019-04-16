@@ -1,6 +1,38 @@
 #!/usr/bin/env python
 
 
+def autocorrelated_prior(heterochronous):
+	str = '''
+	real logn_autocorrelated_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
+		int S = size(heights) + 1;
+		int nodeCount = S + size(heights);
+		real logP = 0.0;
+		// no rate at root and rate of first child is exponentialy distributed
+		for(i in 3:nodeCount){{
+			if(map[i,2] == nodeCount){{
+				if(map[i,1] > S){{
+					logP += normal_lpdf(log(rates[map[i,1]]) | log(rates[map[2,1]]), nu*(2.0*heights[map[i,2]-S] - heights[map[i,1]-S] - heights[map[2,1]-S])/2.0);
+				}}
+				else{{
+					logP += normal_lpdf(log(rates[map[i,1]]) | log(rates[map[2,1]]), nu*(2.0*heights[map[i,2]-S]{1} - heights[map[2,1]-S])/2.0);
+				}}
+			}}
+			else if(map[i,1] > S){{
+				logP += normal_lpdf(log(rates[map[i,1]]) | log(rates[map[i,2]]), nu*(heights[map[i,2]-S] - heights[map[i,1]-S])/2.0);
+			}}
+			else{{
+				logP += normal_lpdf(log(rates[map[i,1]]) | log(rates[map[i,2]]), nu*(heights[map[i,2]-S]{1})/2.0);
+			}}
+		}}
+		return logP;
+	}}
+'''
+	if heterochronous:
+		return str.format(', real[] lowers', ' - lowers[map[i,1]]')
+	else:
+		return str.format('', '')
+
+
 def get_weibull(invariant=False):
 	weibull_pinv_site_rates = """
 		{
@@ -124,12 +156,12 @@ def skyride_coalescent(heterochronous):
 		for( i in 1:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
-				times[map[i,1]] = heights[map[i,1]-S];
-				childCounts[map[i,1]] = 2;
+				times[i] = heights[map[i,1]-S];
+				childCounts[i] = 2;
 			}}
 			else{{
-				times[map[i,1]] = {1};
-				childCounts[map[i,1]] = 0;
+				times[i] = {1};
+				childCounts[i] = 0;
 			}}
 		}}
 
@@ -271,7 +303,7 @@ def GMRF():
 	return gmrf_logP
 
 
-def heights_to_blens(heterochronous=False):
+def heights_to_blens(heterochronous=False, strict=True):
 	model_heights_to_blens = """
 	// populate blens from heights array in preorder
 	for( j in 2:(bcount+1) ){{
@@ -285,10 +317,12 @@ def heights_to_blens(heterochronous=False):
 	}}
 """
 	if heterochronous:
-		return model_heights_to_blens.format(' - lowers[map[j,1]]')
+		model_heights_to_blens = model_heights_to_blens.format(' - lowers[map[j,1]]')
 	else:
-		return model_heights_to_blens.format('')
-
+		model_heights_to_blens = model_heights_to_blens.format('')
+	if not strict:
+		return model_heights_to_blens.replace('rate', 'substrates[map[j,1]]')
+	return model_heights_to_blens
 	
 def transform_heights(heterochronous=False):
 	transform_str = """
@@ -612,8 +646,20 @@ def get_model(params):
 		if params.estimate_rate:
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
-				#data_block.append('real <lower=0> meanRate;')
 				model_priors.append('rate ~ exponential(1.0/1000);')
+			elif params.clock == 'uncorrelated':
+				parameters_block.append('real <lower=0> substrates[bcount];')
+				model_priors.append('substrates ~ exponential(1.0/1000);')
+			elif params.clock == 'autocorrelated':
+				parameters_block.append('real <lower=0> nu;')
+				parameters_block.append('real <lower=0.001, upper=0.01> substrates[2*S-2];')
+				functions_block.append(autocorrelated_prior(params.heterochronous))
+				if params.heterochronous:
+					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu, lowers);')
+				else:
+					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu);')
+				model_priors.append('substrates[map[2,1]] ~ exponential(1.0/1000);')
+
 		else:
 			data_block.append('real <lower=0> rate;')
 
@@ -626,8 +672,8 @@ def get_model(params):
 		else:
 			parameters_block.append('real<lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map);')
-		
-		model_block.append(heights_to_blens(params.heterochronous))
+
+		model_block.append(heights_to_blens(params.heterochronous, params.clock == 'strict' or not params.estimate_rate))
 
 		# Coalescent
 		if params.coalescent == 'constant':
