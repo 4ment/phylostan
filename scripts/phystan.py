@@ -12,21 +12,6 @@ import generate_script
 import glob
 import tempfile
 import filecmp
-#
-# reads a Stan ADVI diagnostic file to extract the best ELBO
-#
-def get_elbo(diag_filename):
-    diag_file = open(diag_filename, "r")
-    best_elbo=1
-    for line in diag_file:
-        if line.startswith("#"):
-            continue
-        line.rstrip("\n")
-        d = line.split(",")
-        d[2] = float(d[2])
-        if best_elbo > 0 or best_elbo < d[2]:
-            best_elbo = d[2]
-    return best_elbo
 
 
 parser = argparse.ArgumentParser('Phylogenetics in Stan')
@@ -41,7 +26,7 @@ parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=True,
 parser.add_argument('-o', '--output', required=False, help="""Output file""")
 parser.add_argument('-F', '--force', action="store_true", help="""Recompile StanModel""")
 parser.add_argument('-s', '--script', required=False, help="""Stan script file""")
-parser.add_argument('-p', '--parameters', required=False, help="""Parameters for Stan script""")
+parser.add_argument('-G', '--generate', action='store_true', help="""Generate Stan script file""")
 parser.add_argument('-e', '--eta', required=False, type=float, help="""eta for Stan script""")
 parser.add_argument('-S', '--seed', required=False, type=int, help="""Seed for Stan script""")
 parser.add_argument('-I', '--invariant', required=False, action='store_true',
@@ -54,7 +39,7 @@ parser.add_argument('--heterochronous', action="store_true",
                     help="""Heterochronous data. Expect a date in the leaf names""")
 parser.add_argument('--lower_root', type=float, default=0.0, help="""Lower bound of the root""")
 parser.add_argument('--rate', required=False, type=float, help="""Susbstitution rate""")
-parser.add_argument('--clock', required=False, choices=['strict'], default=None, help="""Type of clock""")
+parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated'], default=None, help="""Type of clock""")
 parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
                     help="""Type of coalescent (constant or skyride)""")
@@ -77,12 +62,12 @@ with open(arg.tree.name) as fp:
 
 tree = Tree.get(file=arg.tree, schema=tree_format, tree_offset=0, taxon_namespace=taxa, preserve_underscores=True)
 
-dna_format = 'nexus'
+seqs_args = dict(schema='nexus', preserve_underscores=True)
 with open(arg.input.name) as fp:
     if next(fp).startswith('>'):
-        dna_format = 'fasta'
+        seqs_args = dict(schema='fasta')
 
-dna = DnaCharacterMatrix.get(file=arg.input, schema=dna_format, preserve_underscores=True)
+dna = DnaCharacterMatrix.get(file=arg.input, **seqs_args)
 alignment_length = dna.sequence_size
 sequence_count = len(dna)
 
@@ -120,7 +105,6 @@ if arg.heterochronous:
     newest = -1
     for node in tree.postorder_node_iter():
         node.date = 0.0
-        node.annotations.add_bound_attribute("date")
         if node.is_leaf():
             node.date = float(str(node.taxon).split('_')[-1][:-1])
             newest = max(node.date, newest)
@@ -172,11 +156,15 @@ source_file = 'temp.stan'
 binary = None
 source_bin = None
 
-# script provided
-if arg.script:
+# script is provided
+if arg.script and not arg.generate:
     source_file = arg.script
-    binary = source_file + '.pkl'
+    with open(source_file) as fp:
+        script = fp.read()
 else:
+    # generate script
+    if arg.script:
+        source_file = arg.script
     with open(source_file, 'w') as fp:
         script = generate_script.get_model(arg)
         fp.write(script)
@@ -208,19 +196,6 @@ if binary is None or arg.force:
 else:
     sm = pickle.load(open(binary, 'rb'))
 
-# use arguments
-# example: "frequencies_alpha=[1,1,1,1] rates_alpha=[1,1,1,1,1]"
-if arg.parameters:
-    params = arg.parameters.split(' ')
-    for param in params:
-        name, values = param.split('=')
-        # list
-        if values.startswith('['):
-            data[name] = [float(v) for v in values.strip('[]').split()]
-        # scalar
-        else:
-            data[name] = float(values)
-
 # Samples output file
 sample_path = arg.input.name + '.log'
 if arg.output:
@@ -236,13 +211,7 @@ if arg.algorithm == 'vb':
 
     fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path,
                 diagnostic_file=sample_path + ".diag", algorithm=arg.variational, **stan_args)
-    #elbo = get_elbo(sample_path+".diag")
-    #print "Marginal likelihood lower bound is " + str(elbo)
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path)
-#print(fit)
 
-# with open(arg.input.name+'.info', 'w') as fp:
-#     fp.write(str(fit))
-
-
+phylo.convert_samples_to_nexus(tree, sample_path, arg.input.name + '.trees')

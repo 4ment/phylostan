@@ -1,7 +1,6 @@
 import numpy
 import math
 
-
 class GTR:
     """
     GTR substitution model
@@ -70,12 +69,13 @@ def get_peeling_order(tree):
                 [x.index for x in node.child_node_iter()] + [node.index])
     return peeling
 
+
 def get_preorder(tree):
     peeling = []
     peeling.append([tree.seed_node.index, 0])
     for node in tree.preorder_node_iter():
         if node.parent_node is not None:
-            peeling.append([node.index, node.parent_node.index])#, len([n for n in node.child_node_iter()])])
+            peeling.append([node.index, node.parent_node.index])
     return peeling
 
 
@@ -88,10 +88,8 @@ def get_lowers(tree):
             ll[node] = node.date
         else:
             ll[node] = max([ll[x] for x in node.child_node_iter()])
-            #print('{} {} {}'.format(node.index, ll[node], ' '.join([str(x.date) for x in node.child_node_iter()])))
 
     for node in tree.preorder_node_iter():
-        #print('{} {}'.format(node.index, ll[node], ' '.join([str(x.date) for x in node.child_node_iter()])))
         lowers[node.index-1] = ll[node]
     return lowers
 
@@ -106,6 +104,7 @@ def get_peeling_orders(trees):
                 peelings[i][j][:] = [x.index for x in node.child_node_iter()] + [node.index]
                 j += 1
     return peelings
+
 
 def get_dna_leaves_partials(alignment):
     tipdata = numpy.zeros((len(alignment), alignment.sequence_size, 4), dtype=numpy.int)
@@ -210,7 +209,6 @@ def setup_indexes(tree, dna):
                     break
 
 
-
 def create_adjency_matrix(n):
     W = numpy.zeros((n, n))
     for i in range(n-1):
@@ -219,6 +217,7 @@ def create_adjency_matrix(n):
     for i in range(n):
         W[i,i] = -sum(W[i,])
     return W
+
 
 def constant_coalescent(times, pop):
     """
@@ -297,3 +296,92 @@ def compute_likelihood(tree, alignment, model):
     return lnl
 
 
+def to_nexus(node, fp):
+    if not node.is_leaf():
+        fp.write('(')
+        for i, n in enumerate(node.child_node_iter()):
+            to_nexus(n, fp)
+            if i == 0:
+                fp.write(',')
+        fp.write(')')
+    else:
+        fp.write(str(node.index))
+    if hasattr(node, 'date'):
+        fp.write('[&height={}'.format(node.date))
+        if hasattr(node, 'rate'):
+            fp.write(',rate={}'.format(node.rate))
+        fp.write(']')
+    if node.parent_node is not None:
+        fp.write(':{}'.format(node.edge_length))
+    else:
+        fp.write(';')
+
+
+def convert_samples_to_nexus(tree, input, output):
+    taxaCount = len(tree.taxon_namespace)
+    outp = open(output, 'w')
+    outp.write('#NEXUS\nBegin trees;\nTranslate\n')
+    outp.write(',\n'.join([str(i + 1) + ' ' + x.label.replace("'", '') for i, x in enumerate(tree.taxon_namespace)]))
+    outp.write('\n;\n')
+
+    time = False
+    with open(input) as fp:
+        for line in fp:
+            if line.startswith('lp'):
+                try:
+                    line.split(',').index('blens.1')
+                except ValueError:
+                    time = True
+                break
+
+    count = 1
+    if time:
+        with open(input) as fp:
+            for line in fp:
+                if line.startswith('lp'):
+                    header = line.split(',')
+                    hindex = header.index('heights.1')
+                    strict = False
+                    try:
+                        rindex = header.index('substrates.1')
+                    except ValueError:
+                        rindex = header.index('rate')
+                        strict = True
+                elif not line.startswith('#'):
+                    l = line.split(',')
+                    for n in tree.postorder_node_iter():
+                        if not n.is_leaf():
+                            n.date = float(l[hindex + n.index-taxaCount - 1])
+                    if strict:
+                        for n in tree.postorder_node_iter():
+                            if n.parent_node is not None:
+                                n.rate = float(l[rindex])
+                    else:
+                        for n in tree.postorder_node_iter():
+                            if n.parent_node is not None:
+                                n.rate = float(l[rindex + n.index-1])
+
+                    for n in tree.postorder_node_iter():
+                        if n.parent_node is not None:
+                            n.edge_length = n.parent_node.date - n.date
+                    outp.write('tree {} = '.format(count))
+                    count += 1
+                    to_nexus(tree.seed_node, outp)
+                    outp.write('\n')
+    else:
+        with open(input) as fp:
+            for line in fp:
+                if line.startswith('lp'):
+                    header = line.split(',')
+                    bindex = header.index('blens.1')
+                elif not line.startswith('#'):
+                    l = line.split(',')
+                    for n in tree.postorder_node_iter():
+                        if n.parent_node is not None:
+                            n.edge_length = float(l[bindex + n.index - 1])
+                    outp.write('tree {} = '.format(count))
+                    count += 1
+                    to_nexus(tree.seed_node, outp)
+                    outp.write('\n')
+    outp.write('END;')
+    outp.close()
