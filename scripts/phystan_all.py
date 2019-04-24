@@ -40,8 +40,8 @@ with open(trees_path, 'r') as f:
             i += 1
             continue
 
-        # cmd = ['python', os.path.join(my_path, 'phystan.py'), '-t', temp_tree_path, '-i', args.alignment, '-o', output, '-m', 'JC69']
-        cmd = ['python', os.path.join(my_path, 'phystan.py'), '-t', temp_tree_path, '-i', args.alignment, '-o', output,
+        # cmd = ['python', os.path.join(my_path, 'phylostan.py'), '-t', temp_tree_path, '-i', args.alignment, '-o', output, '-m', 'JC69']
+        cmd = ['python', os.path.join(my_path, 'phylostan.py'), '-t', temp_tree_path, '-i', args.alignment, '-o', output,
                '-m', 'GTR', '-q', 'fullrank']
         print(' '.join(cmd))
 
