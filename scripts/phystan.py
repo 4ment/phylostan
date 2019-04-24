@@ -15,7 +15,7 @@ import filecmp
 
 
 parser = argparse.ArgumentParser('Phylogenetics in Stan')
-parser.add_argument('-m', '--model', choices=['JC69', 'GTR'], default='GTR',
+parser.add_argument('-m', '--model', choices=['JC69', 'HKY', 'GTR'], default='GTR',
                     help="""Substitution model [default: %(default)s]""")
 parser.add_argument('-a', '--algorithm', choices=['vb', 'nuts', 'hmc'], default='vb',
                     help="""Algorithm [default: %(default)s]""")
@@ -39,12 +39,14 @@ parser.add_argument('--heterochronous', action="store_true",
                     help="""Heterochronous data. Expect a date in the leaf names""")
 parser.add_argument('--lower_root', type=float, default=0.0, help="""Lower bound of the root""")
 parser.add_argument('--rate', required=False, type=float, help="""Susbstitution rate""")
-parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated'], default=None, help="""Type of clock""")
+parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'uncorrelated'], default=None, help="""Type of clock""")
 parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
                     help="""Type of coalescent (constant or skyride)""")
 parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
+parser.add_argument('--elbo_samples', required=False, type=int, default=100, help="""Number of samples for Monte Carlo estimate of ELBO""")
+parser.add_argument('--grad_samples', required=False, type=int, default=1, help="""Number of samples for Monte Carlo estimate of gradients""")
 arg = parser.parse_args()
 
 my_path = os.path.split(os.path.realpath(__file__))[0]
@@ -60,7 +62,9 @@ with open(arg.tree.name) as fp:
     if next(fp).upper().startswith('#NEXUS'):
         tree_format = 'nexus'
 
-tree = Tree.get(file=arg.tree, schema=tree_format, tree_offset=0, taxon_namespace=taxa, preserve_underscores=True)
+tree = Tree.get(file=arg.tree, schema=tree_format, tree_offset=0, taxon_namespace=taxa, preserve_underscores=True, rooting='force-rooted')
+if len(tree.seed_node.adjacent_nodes()) > 2:
+    tree.reroot_at_edge(tree.seed_node.adjacent_nodes()[0].edge)
 
 seqs_args = dict(schema='nexus', preserve_underscores=True)
 with open(arg.input.name) as fp:
@@ -122,12 +126,17 @@ data = {'peel': peeling, 'tipdata': tipdata, 'L': alignment_length, 'S': sequenc
 
 if arg.clock is not None:
     data['map'] = phylo.get_preorder(tree)
-    data['rate'] = arg.rate if arg.rate else 1.0 # 7.9E-4
+    if not arg.estimate_rate:
+        data['rate'] = arg.rate if arg.rate else 1.0 # 7.9E-4
     if arg.heterochronous:
         data['lowers'] = phylo.get_lowers(tree)
         data['lower_root'] = max(oldest, arg.lower_root)
     else:
         data['lower_root'] = arg.lower_root
+else:
+    last = peeling[-1]
+    if last[0] > last[1]:
+        peeling[-1] = [last[1], last[0], last[2]]
 
 if arg.categories > 1:
     data['C'] = arg.categories
@@ -198,20 +207,23 @@ else:
 
 # Samples output file
 sample_path = arg.input.name + '.log'
+tree_path = arg.input.name + '.trees'
 if arg.output:
     sample_path = arg.output
+    tree_path = sample_path + '.trees'
 
 if arg.algorithm == 'vb':
     stan_args = {}
+    stan_args['output_samples'] = 10000
     if arg.eta:
         stan_args['eta'] = arg.eta
         stan_args['adapt_engaged'] = False
     if arg.seed:
         stan_args['seed'] = arg.seed
 
-    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=100, iter=10000, sample_file=sample_path,
-                diagnostic_file=sample_path + ".diag", algorithm=arg.variational, **stan_args)
+    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples, iter=10000,
+                sample_file=sample_path, diagnostic_file=sample_path + ".diag", algorithm=arg.variational, **stan_args)
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path)
 
-phylo.convert_samples_to_nexus(tree, sample_path, arg.input.name + '.trees')
+phylo.convert_samples_to_nexus(tree, sample_path, tree_path)

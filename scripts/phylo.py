@@ -378,7 +378,10 @@ def convert_samples_to_nexus(tree, input, output):
                     l = line.split(',')
                     for n in tree.postorder_node_iter():
                         if n.parent_node is not None:
-                            n.edge_length = float(l[bindex + n.index - 1])
+                            if bindex + n.index - 1 < len(l):
+                                n.edge_length = float(l[bindex + n.index - 1])
+                            else:
+                                n.edge_length = 0.0
                     outp.write('tree {} = '.format(count))
                     count += 1
                     to_nexus(tree.seed_node, outp)

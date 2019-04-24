@@ -396,6 +396,62 @@ def JC69(C=1, invariant=False):
 		return jc69_function_str.format(*['']*6)
 
 
+def HKY(C=1, invariant=False):
+	hky_function_str = '''
+	matrix[] calculate_hky_p_matrices(vector freqs, real kappa, vector blens{0}){{
+		{1}
+		int bcount = rows(blens);
+		matrix[4,4] pmats[bcount{2}]; // probability matrices
+
+		matrix[4,4] Q; // rate matrix
+		matrix[4,4] P2 = diag_matrix(sqrt(freqs));        // diagonal sqrt frequencies
+		matrix[4,4] P2inv = diag_matrix(1.0 ./ sqrt(freqs)); // diagonal inverse sqrt frequencies
+		matrix[4,4] A; // another symmetric matrix
+		vector[4] eigenvalues;
+		matrix[4,4] eigenvectors;
+		matrix[4,4] m1;
+		matrix[4,4] m2;
+		// symmetric rate matrix
+		matrix[4,4] R = [[0.0, 1.0, kappa, 1.0],
+						 [1.0, 0.0, 1.0, kappa],
+						 [kappa, 1.0, 0.0, 1.0],
+						 [1.0, kappa, 1.0, 0.0]];
+		real s = 0.0;
+		int index = 1;
+
+		Q = R * diag_matrix(freqs);
+		for (i in 1:4) {{
+			Q[i,i] = 0.0;
+			Q[i,i] = -sum(Q[i,1:4]);
+			s -= Q[i,i] * freqs[i];
+		}}
+		Q /= s;
+
+		A = P2 * Q * P2inv;
+
+		eigenvalues = eigenvalues_sym(A);
+		eigenvectors = eigenvectors_sym(A);
+
+		m1 = P2inv * eigenvectors;
+		m2 = eigenvectors' * P2;
+
+		{3}
+			for( b in 1:bcount ){{
+				pmats[index] = m1 * diag_matrix(exp(eigenvalues*blens[b]{4})) * m2;
+				index += 1;
+			}}
+		{5}
+
+		return pmats;
+	}}
+'''
+
+	if C > 1 or invariant:
+		return hky_function_str.format(', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}')
+	else:
+		return hky_function_str.format('', '', '', '', '', '')
+
+
 def GTR(C=1, invariant=False):
 	gtr_function_str = '''
 	matrix[] calculate_gtr_p_matrices(vector freqs, vector rates, vector blens{0}){{
@@ -518,11 +574,8 @@ def likelihood(mixture, clock=True):
 		}
 		partials[peel[S-1,3],i] = (pmats[peel[S-1,1]]*partials[peel[S-1,1],i]) .* partials[peel[S-1,2],i];
 
-		for(j in 1:4){
-			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
-		}
 		// add the site log likelihood
-		target += log(sum(partials[2*S,i]))*weights[i];
+		target += log(sum(partials[peel[S-1,3],i] .* freqs))*weights[i];
 	}
 """
 	model_calculate_unconstrained_mixture_logP = """
@@ -646,10 +699,7 @@ def get_model(params):
 		if params.estimate_rate:
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
-				model_priors.append('rate ~ exponential(1.0/1000);')
-			elif params.clock == 'uncorrelated':
-				parameters_block.append('real <lower=0> substrates[bcount];')
-				model_priors.append('substrates ~ exponential(1.0/1000);')
+				model_priors.append('rate ~ exponential(1000);')
 			elif params.clock == 'autocorrelated':
 				parameters_block.append('real <lower=0> nu;')
 				parameters_block.append('real <lower=0.001, upper=0.01> substrates[2*S-2];')
@@ -658,7 +708,10 @@ def get_model(params):
 					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu, lowers);')
 				else:
 					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu);')
-				model_priors.append('substrates[map[2,1]] ~ exponential(1.0/1000);')
+				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+			elif params.clock == 'uncorrelated':
+				parameters_block.append('real <lower=0> substrates[2*S-2];')
+				model_priors.append('substrates ~ exponential(1000);')
 
 		else:
 			data_block.append('real <lower=0> rate;')
@@ -718,7 +771,7 @@ def get_model(params):
 			model_priors.append('thetas ~ gmrf(tau);')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
-		parameters_block.append('vector<lower=0,upper=10> [bcount] blens; // branch lengths')
+		parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
 		model_priors.append('blens ~ exponential(10);')
 
 	# Substitution model
@@ -737,15 +790,29 @@ def get_model(params):
 			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens, rs);')
 		else:
 			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens);')
+	elif params.model == 'HKY':
+		data_block.append('vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies')
+
+		parameters_block.append('real<lower=0> kappa;')
+		parameters_block.append('simplex[4] freqs;')
+
+		model_priors.append('kappa ~ lognormal(1.0,1.25);')
+		model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
+
+		functions_block.append(HKY(params.categories, params.invariant))
+		if params.invariant or params.categories > 1:
+			model_block.append('pmats = calculate_hky_p_matrices(freqs, kappa, blens, rs);')
+		else:
+			model_block.append('pmats = calculate_hky_p_matrices(freqs, kappa, blens);')
 	elif params.model == 'JC69':
-		model_block_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
+		transformed_data_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
 		functions_block.append(JC69(params.categories, params.invariant))
 		if params.invariant or params.categories > 1:
 			model_block.append('pmats = calculate_jc69_p_matrices(blens, rs);')
 		else:
 			model_block.append('pmats = calculate_jc69_p_matrices(blens);')
 	else:
-		raise ValueError('Supports JC69 and GTR only.')
+		raise ValueError('Supports JC69, HKY and GTR only.')
 
 	# Tree likelihood
 	model_block.append(likelihood(params.categories > 1 or params.invariant, params.clock is not None))
