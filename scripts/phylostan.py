@@ -47,6 +47,7 @@ parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Num
 parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
 parser.add_argument('--elbo_samples', required=False, type=int, default=100, help="""Number of samples for Monte Carlo estimate of ELBO""")
 parser.add_argument('--grad_samples', required=False, type=int, default=1, help="""Number of samples for Monte Carlo estimate of gradients""")
+parser.add_argument('--dry', action='store_true', help="""Do not run""")
 arg = parser.parse_args()
 
 my_path = os.path.split(os.path.realpath(__file__))[0]
@@ -119,6 +120,9 @@ if arg.heterochronous:
         if node.is_leaf():
             node.date = newest - node.date
             oldest = max(oldest, node.date)
+else:
+    for node in tree.postorder_node_iter():
+        node.date = 0.0
 
 peeling = phylo.get_peeling_order(tree)
 
@@ -205,6 +209,9 @@ if binary is None or arg.force:
 else:
     sm = pickle.load(open(binary, 'rb'))
 
+if arg.dry:
+    exit(0)
+
 # Samples output file
 sample_path = arg.input.name + '.log'
 tree_path = arg.input.name + '.trees'
@@ -226,4 +233,4 @@ if arg.algorithm == 'vb':
 else:
     fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path)
 
-phylo.convert_samples_to_nexus(tree, sample_path, tree_path)
+phylo.convert_samples_to_nexus(tree, sample_path, tree_path, arg.rate)

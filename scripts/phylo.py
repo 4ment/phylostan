@@ -317,7 +317,7 @@ def to_nexus(node, fp):
         fp.write(';')
 
 
-def convert_samples_to_nexus(tree, input, output):
+def convert_samples_to_nexus(tree, input, output, rate=None):
     taxaCount = len(tree.taxon_namespace)
     outp = open(output, 'w')
     outp.write('#NEXUS\nBegin trees;\nTranslate\n')
@@ -341,11 +341,14 @@ def convert_samples_to_nexus(tree, input, output):
                 if line.startswith('lp'):
                     header = line.split(',')
                     hindex = header.index('heights.1')
-                    strict = False
-                    try:
-                        rindex = header.index('substrates.1')
-                    except ValueError:
-                        rindex = header.index('rate')
+                    if rate is None:
+                        strict = False
+                        try:
+                            rindex = header.index('substrates.1')
+                        except ValueError:
+                            rindex = header.index('rate')
+                            strict = True
+                    else:
                         strict = True
                 elif not line.startswith('#'):
                     l = line.split(',')
@@ -355,7 +358,7 @@ def convert_samples_to_nexus(tree, input, output):
                     if strict:
                         for n in tree.postorder_node_iter():
                             if n.parent_node is not None:
-                                n.rate = float(l[rindex])
+                                n.rate = float(l[rindex]) if rate is None else rate
                     else:
                         for n in tree.postorder_node_iter():
                             if n.parent_node is not None:
