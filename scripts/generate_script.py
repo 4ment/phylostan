@@ -180,8 +180,8 @@ def skyride_coalescent(heterochronous):
 				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/exp(pop[index]);
 				if (childCounts[indices[i]] != 0) {{
 					logP -= pop[index];
+					index += 1;
 				}}
-				index += 1;
 			}}
 
 			// sampling event

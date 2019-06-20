@@ -152,12 +152,9 @@ if arg.clock is not None:
         data['G'] = arg.grid - 1
         data['grid'] = numpy.linspace(0, arg.cutoff, arg.grid)[1:]
         # data['log_mu'] = numpy.log(4)
-
-    # Not used by constant coalescent
-    if arg.heterochronous:
-        data['I'] = len(set(dates)) + sequence_count - 2 # #unique sampling dates + #internal nodes -1
-    else:
-        data['I'] = sequence_count - 1  # #unique sampling dates + #internal nodes -1
+    elif arg.coalescent == 'skyride':
+        # number of coalescent intervals
+        data['I'] = sequence_count - 1
 
 if arg.model == 'GTR':
     data['frequencies_alpha'] = [1, 1, 1, 1]
@@ -195,7 +192,7 @@ for filename in stanscripts:
 # binary file does not exists so copy file to bin and then compile
 if binary is None or arg.force:
     if binary is None and source_bin is None:
-        f = tempfile.NamedTemporaryFile(dir=os.path.join(my_path, '..', 'bin'), suffix='.stan', delete=False)
+        f = tempfile.NamedTemporaryFile(dir=os.path.join(my_path, '..', 'bin'), suffix='.stan', delete=False, mode='w')
         f.write(script)
         f.close()
         source_file = f.name
