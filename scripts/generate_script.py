@@ -303,6 +303,44 @@ def GMRF():
 	return gmrf_logP
 
 
+def GMRF_time_aware(heterochronous):
+	gmrf_logP = """
+	// Time aware (mid-point)
+	real gmrf_log(vector logPopSize, real precision, real[] heights, int[,] mapDEF){
+		int S = size(heights)+1; // number of leaves from the number of internal nodes
+		int nodeCount = size(heights) + S;
+		int N = S - 1;
+		real realN = N;
+		real s = 0;
+
+		int indices[nodeCount];
+		real times[nodeCount];
+
+		for( i in 1:nodeCount ){
+			// internal node: transform
+			if(map[i,1] > S){
+				times[i] = heights[map[i,1]-S];
+			}
+			else{
+				times[i] = TIP;
+			}
+		}
+
+		// calculate intervals
+		indices = sort_indices_asc(times);
+
+		for (i in 2:N){
+			s += pow(logPopSize[i-1]-logPopSize[i], 2.0)*2.0/(times[indices[S+i]] - times[indices[S+i-2]]);
+		}
+		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
+	}
+"""
+	if heterochronous:
+		return gmrf_logP.replace('DEF', ', real[] lowers').replace('TIP', 'lowers[map[i,1]]')
+	else:
+		return gmrf_logP.replace('DEF', '').replace('TIP', '0')
+
+
 def heights_to_blens(heterochronous=False, strict=True):
 	model_heights_to_blens = """
 	// populate blens from heights array in preorder
@@ -710,8 +748,13 @@ def get_model(params):
 					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu);')
 				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
 			elif params.clock == 'uncorrelated':
+				# parameters_block.append('real <lower=0> mu;')
+				# parameters_block.append('real <lower=0> sigma;')
 				parameters_block.append('real <lower=0> substrates[2*S-2];')
 				model_priors.append('substrates ~ exponential(1000);')
+				# model_priors.append('substrates ~ lognormal(mu, sigma);')
+				# model_priors.append('mu ~ exponential(1000);')
+				# model_priors.append('sigma ~ gamma(0.5396, 2.6184);')
 
 		else:
 			data_block.append('real <lower=0> rate;')
@@ -741,6 +784,7 @@ def get_model(params):
 		elif params.coalescent == 'skyride':
 			functions_block.append(skyride_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
+			# functions_block.append(GMRF_time_aware(params.heterochronous))
 
 			data_block.append('int I; // number of intervals')
 
@@ -749,11 +793,12 @@ def get_model(params):
 
 			if params.heterochronous:
 				model_priors.append('heights ~ skyride_coalescent(thetas, map, lowers);')
+				# model_priors.append('thetas ~ gmrf(tau, heights, map, lowers);')
 			else:
 				model_priors.append('heights ~ skyride_coalescent(thetas, map);')
+				# model_priors.append('thetas ~ gmrf(tau, heights, map);')
 
 			model_priors.append('thetas ~ gmrf(tau);')
-			model_priors.append('tau ~ gamma(0.001, 0.001);')
 		elif params.coalescent == 'skygrid':
 			functions_block.append(skygrid_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
