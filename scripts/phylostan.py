@@ -47,6 +47,8 @@ parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Num
 parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
 parser.add_argument('--elbo_samples', required=False, type=int, default=100, help="""Number of samples for Monte Carlo estimate of ELBO""")
 parser.add_argument('--grad_samples', required=False, type=int, default=1, help="""Number of samples for Monte Carlo estimate of gradients""")
+parser.add_argument('--iter', required=False, type=int, default=100000, help="""Number of iterations""")
+parser.add_argument('--chains', required=False, type=int, default=1, help="""Number of chains for sampling algorithms""")
 parser.add_argument('--dry', action='store_true', help="""Do not run""")
 arg = parser.parse_args()
 
@@ -218,16 +220,16 @@ if arg.output:
 
 if arg.algorithm == 'vb':
     stan_args = {}
-    stan_args['output_samples'] = 10000
+    stan_args['output_samples'] = 1000
     if arg.eta:
         stan_args['eta'] = arg.eta
         stan_args['adapt_engaged'] = False
     if arg.seed:
         stan_args['seed'] = arg.seed
 
-    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples, iter=10000,
+    fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples, iter=arg.iter,
                 sample_file=sample_path, diagnostic_file=sample_path + ".diag", algorithm=arg.variational, **stan_args)
 else:
-    fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path)
+    fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path, chains=arg.chains)
 
 phylo.convert_samples_to_nexus(tree, sample_path, tree_path, arg.rate)

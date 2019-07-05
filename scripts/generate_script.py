@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 
 def autocorrelated_prior(heterochronous):
 	str = '''
@@ -295,7 +293,7 @@ def GMRF():
 		real realN = N;
 		real s = 0;
 		for (i in 2:N){
-			s += pow(logPopSize[i-1]-logPopSize[i], 2.0);
+			s += pow(logPopSize[i]-logPopSize[i-1], 2.0);
 		}
 		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
 	}
@@ -330,7 +328,7 @@ def GMRF_time_aware(heterochronous):
 		indices = sort_indices_asc(times);
 
 		for (i in 2:N){
-			s += pow(logPopSize[i-1]-logPopSize[i], 2.0)*2.0/(times[indices[S+i]] - times[indices[S+i-2]]);
+			s += pow(logPopSize[i]-logPopSize[i-1], 2.0)*2.0/(times[indices[S+i]] - times[indices[S+i-2]]);
 		}
 		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
 	}
@@ -799,6 +797,7 @@ def get_model(params):
 				# model_priors.append('thetas ~ gmrf(tau, heights, map);')
 
 			model_priors.append('thetas ~ gmrf(tau);')
+			model_priors.append('tau ~ gamma(0.001, 0.001);')
 		elif params.coalescent == 'skygrid':
 			functions_block.append(skygrid_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
@@ -891,10 +890,3 @@ def get_model(params):
 
 	return script
 
-
-def main():
-	print(get_model())
-
-
-if __name__ == "__main__":
-	main()
