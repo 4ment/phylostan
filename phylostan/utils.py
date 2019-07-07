@@ -1,7 +1,6 @@
 import numpy
 import math
 
-
 def get_peeling_order(tree):
     peeling = []
     for node in tree.postorder_node_iter():
@@ -179,3 +178,73 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
                     outp.write('\n')
     outp.write('END;')
     outp.close()
+
+
+def descriptive_stats(d, alpha):
+    median, low, high = numpy.quantile(d, (0.5, alpha / 2.0, 1.0 - alpha / 2.0))
+    return numpy.mean(d), median, low, high
+
+
+def parse_log(inputfile, alpha=0.05):
+    data = []
+    GTR = ('AC', 'AG', 'AT', 'CG', 'CT', 'GC')
+    frequencies = 'A', 'C', 'G', 'T'
+    variables = {
+        'wshape': 'Weibull (shape)',
+        'pinv': 'Proportion invariant',
+        'kappa': 'HKY (kappa)',
+        'rate': 'Strict clock (rate)',
+        'theta': 'Constant population size (theta)',
+        'tau': 'GMRF precision (tau)'
+    }
+    with open(inputfile) as fp:
+        for line in fp:
+            line = line.strip()
+            if line.startswith('lp'):
+                header = line.split(',')
+                [data.append([]) for _ in range(len(header))]
+            elif not line.startswith('#') and len(line) != 0:
+                for idx, h in enumerate(line.split(',')):
+                    data[idx].append(float(h))
+        for var in header:
+            # GTR
+            if var == 'rates.1':
+                print('GTR')
+                for i in range(6):
+                    d = data[header.index('rates.'+str(i+1))]
+                    mean, median, low, high = descriptive_stats(d, alpha)
+                    print('  {} mean: {:.3E} 95% CI: ({:.3E} {:.3E})'.format(GTR[i], mean, low, high))
+                for i in range(4):
+                    d = data[header.index('freqs.'+str(i+1))]
+                    mean, median, low, high = descriptive_stats(d, alpha)
+                    print('  {} mean: {:.4f} 95% CI: ({:.4f} {:.4f})'.format(frequencies[i], mean, low, high))
+            elif var in variables:
+                d = data[header.index(var)]
+                mean, median, low, high = descriptive_stats(d, alpha)
+                print('{} mean: 95% CI: {} ({} {})'.format(variables[var], mean, low, high))
+
+            # time tree
+        if 'heights.1' in header:
+            index_root_height = 0
+            max_height = 0
+            for idx, h in enumerate(header):
+                if h.startswith('heights.') and data[idx][0] > max_height:
+                    index_root_height = idx
+                    max_height = data[idx][0]
+            d = data[index_root_height]
+            mean, median, low, high = descriptive_stats(d, alpha)
+            print('Root height mean: 95% CI: {} ({} {})'.format(mean, low, high))
+        else:
+            indexes = []
+            for idx, h in enumerate(header):
+                if h.startswith('blens'):
+                    indexes.append(idx)
+            sums = []
+            for row in range(len(data[0])):
+                sum_blens = 0
+                for idx in indexes:
+                    sum_blens += data[idx][row]
+                sums.append(sum_blens)
+            mean, median, low, high = descriptive_stats(sums, alpha)
+            print('Tree length mean: 95% CI: {} ({} {})'.format(mean, low, high))
+
