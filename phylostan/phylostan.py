@@ -96,7 +96,10 @@ def main():
 	# parse_parser.set_defaults(func=parse)
 
 	arg = parser.parse_args()
-	arg.func(arg)
+	try:
+		arg.func(arg)
+	except AttributeError:
+		print('Use -h or --help to show help message')
 
 
 def parse_logs(treeobj, treelog, samplelog, rate, alpha):
