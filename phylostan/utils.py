@@ -213,15 +213,15 @@ def parse_log(inputfile, alpha=0.05):
                 for i in range(6):
                     d = data[header.index('rates.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.3E} 95% CI: ({:.3E} {:.3E})'.format(GTR[i], mean, low, high))
+                    print('  {} mean: {:.3E} 95% CI: ({:.3E},{:.3E})'.format(GTR[i], mean, low, high))
                 for i in range(4):
                     d = data[header.index('freqs.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.4f} 95% CI: ({:.4f} {:.4f})'.format(frequencies[i], mean, low, high))
+                    print('  {} mean: {:.4f} 95% CI: ({:.4f},{:.4f})'.format(frequencies[i], mean, low, high))
             elif var in variables:
                 d = data[header.index(var)]
                 mean, median, low, high = descriptive_stats(d, alpha)
-                print('{} mean: 95% CI: {} ({} {})'.format(variables[var], mean, low, high))
+                print('{} mean: {} 95% CI: ({},{})'.format(variables[var], mean, low, high))
 
             # time tree
         if 'heights.1' in header:
@@ -233,7 +233,7 @@ def parse_log(inputfile, alpha=0.05):
                     max_height = data[idx][0]
             d = data[index_root_height]
             mean, median, low, high = descriptive_stats(d, alpha)
-            print('Root height mean: 95% CI: {} ({} {})'.format(mean, low, high))
+            print('Root height mean: {} 95% CI: ({},{})'.format(mean, low, high))
         else:
             indexes = []
             for idx, h in enumerate(header):
@@ -246,5 +246,5 @@ def parse_log(inputfile, alpha=0.05):
                     sum_blens += data[idx][row]
                 sums.append(sum_blens)
             mean, median, low, high = descriptive_stats(sums, alpha)
-            print('Tree length mean: 95% CI: {} ({} {})'.format(mean, low, high))
+            print('Tree length mean: {} 95% CI: ({},{})'.format(mean, low, high))
 
