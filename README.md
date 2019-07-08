@@ -113,4 +113,4 @@ phylostan run -s fluA-GTR-W4.stan  -m HKY -C 4 \
 The NUTS algorithm is much slower (and more accurate) than variational inference so it should be used on a small dataset.
 
 ## Reference
-Fourment M and Darling E Aaron 
+Fourment Mathieu and Darling E Aaron 

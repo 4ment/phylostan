@@ -24,7 +24,7 @@ def create_parse_parser(subprasers):
 
 
 def create_run_parser(subprasers):
-	parser = create_build_parser(subprasers, 'run', help='run Stan script')
+	parser = create_build_parser(subprasers, 'run', help='run an analysis using a Stan script')
 	parser.add_argument('-t', '--tree', type=argparse.FileType('r'), required=True, help="""Tree file""")
 	parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=True, help="""Sequence file""")
 	parser.add_argument('-o', '--output', required=True, help="""Stem for output files""")
@@ -83,10 +83,16 @@ def create_build_parser(subprasers, prog, help):
 
 
 def main():
-	parser = argparse.ArgumentParser(prog='Phylogenetic inference in Stan')
+	parser_epilog = """To get some information for each sub-command:\n
+	phylostan build --help
+	phylostan run --help
+"""
+
+	parser = argparse.ArgumentParser(prog='phylostan', description='Phylogenetic inference using Stan',
+									epilog=parser_epilog, formatter_class=argparse.RawTextHelpFormatter)
 	subprasers = parser.add_subparsers()
 
-	build_parser = create_build_parser(subprasers, 'build', 'create Stan script')
+	build_parser = create_build_parser(subprasers, 'build', 'build a Stan script')
 	build_parser.set_defaults(func=build)
 
 	run_parser = create_run_parser(subprasers)
@@ -99,7 +105,7 @@ def main():
 	try:
 		arg.func(arg)
 	except AttributeError:
-		print('Use -h or --help to show help message')
+		parser.print_help()
 
 
 def parse_logs(treeobj, treelog, samplelog, rate, alpha):
@@ -217,7 +223,7 @@ def run(arg):
 	if arg.clock is not None:
 		data['map'] = utils.get_preorder(tree)
 		if not arg.estimate_rate:
-			data['rate'] = arg.rate if arg.rate else 1.0 # 7.9E-4
+			data['rate'] = arg.rate if arg.rate else 1.0
 		if arg.heterochronous:
 			data['lowers'] = utils.get_lowers(tree)
 			data['lower_root'] = max(oldest, arg.lower_root)

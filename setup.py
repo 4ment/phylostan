@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="phylostan",
-    version="1.0.0",
+    version="1.0.1",
     author="Mathieu Fourment",
     author_email="mathieu.fourment@uts.edu.au",
     description="Phylogenetic inference with Stan",
