@@ -285,10 +285,20 @@ def run(arg):
 		stan_args = {'seed': arg.seed}
 		fit = sm.sampling(data=data, algorithm=arg.algorithm.upper(), sample_file=sample_path, chains=arg.chains,
 						  iter=arg.iter, thin=arg.thin, **stan_args)
-		for chain in arg.chains:
-			sample_path_chain = sample_path + '_{}.csv'.format(chain)
-			utils.convert_samples_to_nexus(tree, sample_path_chain, tree_path, arg.rate)
-			utils.parse_log(sample_path_chain, 0.05)
+
+		# chain=1 pystan uses sample_file
+		if arg.chains == 1:
+			if sample_path.endswith('.csv'):
+				tree_path = sample_path.replace('.csv', '.trees')
+			utils.convert_samples_to_nexus(tree, sample_path, tree_path, arg.rate)
+			utils.parse_log(sample_path, 0.05)
+		# chain>1 pystan appends _{chain}.csv to sample_file
+		else:
+			for chain in range(arg.chains):
+				sample_path_chain = sample_path + '_{}.csv'.format(chain)
+				tree_path_chain = sample_path + '_{}.trees'.format(chain)
+				utils.convert_samples_to_nexus(tree, sample_path_chain, tree_path_chain, arg.rate)
+				utils.parse_log(sample_path_chain, 0.05)
 
 
 if __name__ == "__main__":
