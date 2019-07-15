@@ -2,6 +2,10 @@
 
 ## Introduction
 
+*phylostan* is a tool written in python for inferring phylogenetic trees from nucleotide datasets. 
+It generates a variety of phylogenetic models using the Stan language.
+ Through the pystan library, *phylostan* has access to Stan's variational inference and sampling (NUTS and HMC) engines.
+
 ## Features
 Phylogenetic model components:
 - Nucleotide substitution models: JC69, HKY, GTR
@@ -9,7 +13,7 @@ Phylogenetic model components:
 - Tree without clock constraint with uniform prior on topology
 - Time tree:
   - Homochronous sequences: same sampling date
-  - Heterochronous sequences: sequences sampled a different time points
+  - Heterochronous sequences: sequences sampled at different time points
  - Molecular clocks:
    - Strict
    - [Autocorrelated](https://doi.org/10.1093/oxfordjournals.molbev.a025892)
@@ -113,4 +117,4 @@ phylostan run -s fluA-GTR-W4.stan  -m HKY -C 4 \
 The NUTS algorithm is much slower (and more accurate) than variational inference so it should be used on a small dataset.
 
 ## Reference
-Fourment Mathieu and Darling E Aaron 
+Mathieu Fourment and Aaron E. Darling. Evaluating probabilistic programming and fast variational Bayesian inference in phylogenetics. _bioRxiv_. doi: [10.1101/702944](https://doi.org/10.1101/702944). 

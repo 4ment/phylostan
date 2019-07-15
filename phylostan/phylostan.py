@@ -126,6 +126,9 @@ def build(arg):
 
 	if arg.compile:
 		binary = arg.script.replace('.stan', '.pkl')
+		# arg.script does not end with .stan
+		if binary == arg.script:
+			binary = arg.script + '.pkl'
 		sm = pystan.StanModel(file=arg.script)
 		with open(binary, 'wb') as f:
 			pickle.dump(sm, f)
@@ -258,6 +261,8 @@ def run(arg):
 	tree_path = sample_path + '.trees'
 
 	binary = arg.script.replace('.stan', '.pkl')
+	if binary == arg.script:
+		binary = arg.script + '.pkl'
 	if not os.path.lexists(binary) or arg.compile:
 		sm = pystan.StanModel(file=arg.script)
 		with open(binary, 'wb') as f:
