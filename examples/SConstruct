@@ -1,0 +1,269 @@
+from SCons.Script import Command
+import os
+from os.path import join
+import subprocess
+from subprocess import check_call
+from timeit import default_timer as timer
+import re
+
+
+env = Environment(ENV=os.environ)
+replicates = int(ARGUMENTS.get('replicates', 10))
+
+phylostan = 'phylostan'
+physher = 'physher'
+
+nuts_chains = 1  # number of chains for NUTS
+
+def run_physher(target, source, env):
+    dataset = env['dataset']
+    index = env['index']
+    replicate = env['replicate']
+    analysis_dir = join(dataset, str(replicate))
+    # read tree file
+    tree_file = join('DS1', 'trees', 'tree{}.tree'.format(index))
+    with open(tree_file, 'r') as fp:
+        for tree in fp:
+            tree = tree.rstrip('\n').rstrip('\r')
+
+    json_file = 'tree' + str(index) + '.json'
+    log_file = 'tree' + str(index) + '.log'
+    aln_file = dataset + '.nex'
+
+    json_file_path = join(analysis_dir, json_file)
+    aln_file_path = join(dataset, aln_file)
+    aln_file_absolute_path = os.path.abspath(aln_file_path)
+    aln_file_rel_path = os.path.relpath(aln_file_absolute_path, analysis_dir)
+
+    with open(str(source[0]), 'r') as f:
+        json_template = f.read()
+
+    # write json file (e.g. tree0.json)
+    with open(json_file_path, 'w') as jsonf:
+        json_local = json_template.replace('TREE_TEMPLATE', tree).replace('LOG_TEMPLATE', log_file).replace(
+            'DATA_TEMPLATE', aln_file_rel_path).replace('SEED', str(replicate))
+        jsonf.write(json_local)
+
+    start = timer()
+    f = open(str(target[0]), 'w')
+    try:
+        check_call([physher, json_file], stdout=f, cwd=analysis_dir)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        pass
+    end = timer()
+    total_time = end - start
+    f.write('TIME: {}'.format(total_time))
+    f.close()
+
+
+def run_beast(target, source, env):
+    start = timer()
+    f = open(str(target[1]), 'w')
+    check_call([env['beast'], '-overwrite', '-working', str(source[0])], stdout=f)
+    end = timer()
+    total_time = end - start
+    f.write('TIME: {}'.format(total_time))
+    f.close()
+
+
+def run_stan(target, source, env):
+    cmd = [phylostan, 'run', '-i', str(source[0]), '-t', str(source[1]), '-s', str(source[2]),
+           '-o', str(target[0])]
+    cmd += env['model']
+    if env['extra']:
+        cmd += env['extra']
+    print(cmd)
+    start = timer()
+    f = open(str(target[1]), 'w')
+    try:
+        check_call(cmd, stdout=f)
+    except subprocess.CalledProcessError as e:
+        pass
+    end = timer()
+    total_time = end - start
+    f.write('TIME: {}'.format(total_time))
+    f.close()
+
+
+def parse_DS1_results(target, source, env):
+    pattern_elbo = re.compile(r'(\d+) ELBO: (-\d+\.\d+)')
+    pattern_stan = re.compile(r'\s+(\d+)\s+(-\d+\.\d+)')
+    pattern_time = re.compile(r'TIME: (\d+\.\d+)')
+    csvp = open(str(target[0]), 'w')
+    csvp.write('replicate,topology,time,iter,elbo,initial,program\n')
+
+    for infile in source:
+        elbo, hundred, iters, total_time = 0, 0, 0, 0
+        program = 'stan' if str(infile).endswith('diag.txt') else 'physher'
+        with open(str(infile), "r") as fp:
+            for line in fp:
+                if line.startswith("#"):
+                    continue
+                line = line.rstrip('\n').rstrip('\r')
+                if program == 'stan':
+                    melbo = pattern_stan.match(line)
+                else:
+                    melbo = pattern_elbo.match(line)
+                mtime = pattern_time.match(line)
+                if melbo:
+                    elbo = melbo.group(2)
+                    iters = melbo.group(1)
+                    if int(iters) == 100:
+                        hundred = elbo
+                elif mtime:
+                    total_time = mtime.group(1)
+
+        p, f = os.path.split(str(infile)) # examples/DS1/rep/tree{index}.txt
+        _, rep = os.path.split(p)
+        t = re.search(r'(\d+)', f).group(1)
+
+        csvp.write('{},{},{},{},{},{},{}\n'.format(rep, t, total_time, iters, elbo, hundred, program))
+    csvp.close()
+
+
+def parse_results(target, source, env):
+    pattern_stan = re.compile(r'\s+(\d+)\s+(-\d+\.\d+)')
+    pattern_time = re.compile(r'TIME: (\d+\.\d+)')
+    csvp = open(str(target[0]), 'w')
+    csvp.write('family,replicate,time,iter,elbo,initial\n')
+
+    for infile in source:
+        elbo, hundred, iters, total_time = 0, 0, 0, 0
+        with open(str(infile), "r") as fp:
+            for line in fp:
+                if line.startswith("#"):
+                    continue
+                line = line.rstrip('\n').rstrip('\r')
+                melbo = pattern_stan.match(line)
+                mtime = pattern_time.match(line)
+                if melbo:
+                    elbo = melbo.group(2)
+                    iters = melbo.group(1)
+                    if int(iters) == 100:
+                        hundred = elbo
+                elif mtime:
+                    total_time = mtime.group(1)
+
+        p, _ = os.path.split(str(infile))  # examples/HCV/0/fullrank/HCV.diag.txt
+        p, fam = os.path.split(p)
+        _, rep = os.path.split(p)
+
+        csvp.write('{},{},{},{},{},{}\n'.format(fam, rep, total_time, iters, elbo, hundred))
+    csvp.close()
+
+
+if not os.path.lexists(join('DS1', 'trees')):
+    os.mkdir(join('DS1', 'trees'))
+
+with open(join('DS1',  'DS1.trees'), 'r') as fp:
+    count = 0
+    for tree in fp:
+        tree = tree.rstrip('\n').rstrip('\r')
+        tree_file = join('DS1', 'trees', 'tree{}.tree'.format(count))
+        with open(tree_file, 'w') as out:
+            out.write(tree)
+        count += 1
+
+stan_script = join('DS1', 'jc69.stan')
+stan_pkl = join('DS1', 'jc69.pkl')
+env.Command(stan_script, None, action='phylostan build -m JC69 -s $TARGET --compile')
+outputs = []
+
+for replicate in range(replicates):
+    for t in range(count):
+        # run Stan
+        targets = ['', '.diag.txt']
+        targets = [join('DS1', str(replicate), 'tree{}'.format(t) + target) for target in targets]
+        env.Command(target=targets,
+                    source=[join('DS1', 'DS1.nex'), join('DS1', 'trees', 'tree{}.tree'.format(t)), stan_script],
+                    action=run_stan,
+                    model=['-m', 'JC69'],
+                    extra=['--eta', '0.1'])
+
+        # run physher
+        physher_output = join('DS1', str(replicate), "tree" + str(t) + '.txt')
+        env.Command(target=physher_output,
+                    source=join('DS1', 'jc69-vb.json'),
+                    action=run_physher,
+                    dataset='DS1',
+                    replicate=replicate,
+                    index=t)
+
+        outputs.extend((join('DS1', str(replicate), 'tree{}.diag.txt'.format(t)),
+                        join('DS1', str(replicate), 'tree{}.txt'.format(t)),))
+
+env.Command(join('DS1', 'DS1.csv'), outputs, parse_DS1_results)
+
+
+datasets = {
+    'fluA': {
+        'data': 'fluA.fa',
+        'build': '-m HKY -C 4 --estimate_rate --clock strict --heterochronous --coalescent constant',
+        'run': '-m HKY -C 4 --estimate_rate --clock strict --heterochronous --coalescent constant',
+        'beast': 'beast2',
+        'input': 'beast.xml',
+        'output': ['fluA.log']
+    },
+    'HCV': {
+        'data': 'HCV.nexus',
+        'build': '-m GTR -C 4 --clock strict --coalescent skyride',
+        'run': '-m GTR -C 4 --clock strict --rate 7.9e-4 --coalescent skyride',
+        'beast': 'beast',
+        'input': 'hcv.xml',
+        'output': ['hcv.log'],
+    }
+}
+
+for dataset in datasets:
+    outputs = []
+
+    seq_file = join(dataset, datasets[dataset]['data'])
+    tree_file = join(dataset, dataset + '.tree')
+    stan_script = join(dataset, dataset + '.stan')
+
+    # VB
+    env.Command(target=stan_script,
+                source=[seq_file, tree_file],
+                action='phylostan build --compile -s $TARGET ' + datasets[dataset]['build'])
+
+    for replicate in range(1):
+        for q in 'meanfield', 'fullrank':
+            targets = ['', '.diag.txt']
+            targets = [join(dataset, str(replicate), q, dataset + target) for target in targets]
+            env.Command(target=targets,
+                        source=[seq_file, tree_file, stan_script],
+                        action=run_stan, model=datasets[dataset]['run'].split(' '),
+                        extra=['-q', q])
+
+            outputs.append(join(dataset, str(replicate), q, dataset + '.diag.txt'))
+
+    # BEAST
+    for replicate in range(3):
+        location = join(dataset, 'beast', 'run{}'.format(replicate))
+        sources = join(dataset, 'beast', datasets[dataset]['input'])
+        targets = [join(location, output) for output in datasets[dataset]['output']]
+
+        env.Command(target=join(location, datasets[dataset]['input']),
+                    source=sources,
+                    action=Copy('$TARGET', '$SOURCE'))
+
+        env.Command(target=targets + [join(location, dataset + '.txt')],
+                    source=join(location, datasets[dataset]['input']),
+                    action=run_beast,
+                    beast=datasets[dataset]['beast'])
+
+    # NUTS
+    for replicate in range(3):
+        if nuts_chains == 1:
+            targets = ['_0.csv', '.diag.txt']
+        else:
+            targets = ['', '.diag.txt']
+        targets = [join(dataset, 'nuts', str(replicate), 'tree' + target) for target in targets]
+        env.Command(target=targets,
+                    source=[seq_file, tree_file, stan_script],
+                    action=run_stan,
+                    model=datasets[dataset]['run'].split(' '),
+                    extra=['-a', 'nuts', '--chain', str(nuts_chains)])
+ 
+    env.Command(join(dataset, dataset + '.csv'), outputs, parse_results)
