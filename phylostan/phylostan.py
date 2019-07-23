@@ -29,7 +29,7 @@ def create_run_parser(subprasers):
 	parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=True, help="""Sequence file""")
 	parser.add_argument('-o', '--output', required=True, help="""Stem for output files""")
 	parser.add_argument('--lower_root', type=float, default=0.0, help="""Lower bound of the root""")
-	parser.add_argument('--rate', required=False, type=float, help="""Susbstitution rate""")
+	parser.add_argument('--rate', required=False, type=float, help="""Substitution rate""")
 	parser.add_argument('--dates', required=False, type=argparse.FileType('r'),
 						help="""Comma-separated (csv) file containing sequence dates with header 'name,date'""")
 
@@ -46,6 +46,8 @@ def create_run_parser(subprasers):
 						help="""Number of samples for Monte Carlo estimate of gradients (variational only)""")
 	parser.add_argument('--samples', required=False, type=int, default=1000,
 						help="""Number of samples to be drawn from the variational distribution (variational only)""")
+	parser.add_argument('--tol_rel_obj', required=False, type=float, default=0.001,
+						help="""Convergence tolerance on the relative norm of the objective, defaults to 0.001 (variational only)""")
 	# sampling
 	parser.add_argument('--chains', required=False, type=int, default=1,
 						help="""Number of chains for sampling algorithms (NUTS and HMC)""")
@@ -279,7 +281,7 @@ def run(arg):
 		if arg.seed:
 			stan_args['seed'] = arg.seed
 
-		fit = sm.vb(data=data, tol_rel_obj=0.001, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples,
+		fit = sm.vb(data=data, tol_rel_obj=arg.tol_rel_obj, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples,
 					iter=arg.iter, sample_file=sample_path, diagnostic_file=sample_path + ".diag",
 					algorithm=arg.variational, **stan_args)
 
