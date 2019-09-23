@@ -1,0 +1,101 @@
+{
+"init":{
+	"seed":SEED
+},
+"model":{
+	"id":"posterior",
+	"type" : "compound",
+	"distributions":[
+		{
+			"id":"treelikelihood",
+			"type": "treelikelihood",
+			"sitepattern":{
+				"id":"patterns",
+				"type":"sitepattern",		
+				"datatype":"nucleotide",
+				"alignment":{
+					"id": "seqs",
+					"type": "alignment",
+					"file":"DATA_TEMPLATE"
+				}
+			},
+			"sitemodel":{
+				"id": "sitemodel",
+				"type": "sitemodel",
+				"substitutionmodel":{
+					"id":"sm",
+					"type":"substitutionmodel",
+					"model":"jc69",
+					"datatype":"nucleotide",
+					"frequencies":{
+						"id":"freqs",
+						"type":"Simplex",
+						"values":[0.25,0.25,0.25,0.25] 
+					}
+				}
+			},
+			"tree":{
+				"id":"tree",
+				"type":"tree",
+				"parameters":"tree.distances",
+				"newick":"TREE_TEMPLATE"
+			}
+		},
+		{
+			"id":"priorbl",
+			"type": "distribution", 
+			"distribution": "exponential",
+			"parameters":{
+				"lambda":{"id":"lambdabl", "type":"parameter", "value":10, "lower":0}
+			},
+			"x":"%tree.distances"
+		}
+	]
+},
+"vb":{
+	"id":"var",
+	"type": "variational",
+	"posterior": "&posterior",
+	"var" : "meanfield",
+	"distribution" : "normal",
+	"elbosamples": 100,
+	"gradsamples": 1,
+	"parameters": ["%tree.distances"],
+	"var_parameters": "var_tree.distances"
+},
+"physher":[
+	{
+		"id":"metaopt",
+		"type":"optimizer",
+		"algorithm":"meta",
+		"precision":0.0001,
+		"max": 10000,
+		"min": 1,
+		"model":"&posterior",
+		"list":[
+			{				
+				"id":"optbl",
+				"type":"optimizer",
+				"algorithm":"serial",
+				"model":"&posterior",
+				"treelikelihood": "&treelikelihood"
+			}
+		]
+	},
+	{
+		"id": "log",
+		"type": "logger",
+		"models": ["&posterior","&treelikelihood"]
+	},
+	{
+		"id":"sg",
+		"algorithm":"sg",
+		"type":"optimizer",
+		"tol": 0.001,
+		"eta": 0.1,
+		"model": "&var",
+		"max": 1000000,
+		"parameters": ["%var_tree.distances"]
+	}
+]
+}
