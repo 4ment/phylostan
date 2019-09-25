@@ -5,6 +5,7 @@
 *phylostan* is a tool written in python for inferring phylogenetic trees from nucleotide datasets. 
 It generates a variety of phylogenetic models using the Stan language.
  Through the pystan library, *phylostan* has access to Stan's variational inference and sampling (NUTS and HMC) engines.
+The program has been described and its performance evaluated in a [preprint](https://doi.org/10.1101/702944). The data and scripts used to generate the results can be found [here](examples/README.md).
 
 ## Features
 Phylogenetic model components:
