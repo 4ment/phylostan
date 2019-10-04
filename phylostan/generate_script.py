@@ -133,6 +133,76 @@ def constant_coalescent(heterochronous=False):
 	else:
 		return constant_coalescent_str.format('', '0')
 
+def integrated_constant_coalescent(heterochronous=False):
+	integrated_constant_coalescent_str = """
+    real integrated_density(real t, real kappa, real u){{
+      real z = kappa*t;
+      real w = square(z + u);
+      real lnum  = log(2*w*log(u + z) + 3*square(z) + 4*u*z - w*(2*log(z) + 3));
+      real ldenom = log(2) + log(w);  
+      return(log(2) + log(kappa) +  lnum - ldenom -log(u));
+    }}
+    real integrated_constant_coalescent_log(real[] heights, real U, int[,] map{0}){{
+      int S = size(heights) + 1; // number of leaves from the number of internal nodes
+      int nodeCount = size(heights) + S;
+      
+      real logP = 0.0;
+      real lineageCount = 0.0; // first 2 intervals are sampling events
+      
+      int indices[nodeCount];
+      int childCounts[nodeCount];
+      real times[nodeCount];
+      
+      real start;
+      real finish;
+      real interval;
+      
+      for( i in 1:nodeCount ){
+        // internal node: transform
+        if(map[i, 1] > S){
+          times[map[i, 1]] = heights[map[i, 1]-S];
+          childCounts[map[i, 1]] = 2;
+        }
+        else{
+          times[map[i, 1]] = lowers[map[i, 1]];
+          childCounts[map[i, 1]] = 0;
+        }
+      }
+      
+      // calculate intervals
+      indices = sort_indices_asc(times);
+      
+      // first tip
+      start = times[indices[1]];
+      
+      for (i in 1:nodeCount) {
+        finish = times[indices[i]];
+        
+        interval = finish - start;
+        // print("Interval = ", interval, " node = ", i, " lincount =", lineageCount,  " logP = ", logP);
+        
+        if(interval != 0.0 && childCounts[indices[i]] != 0 ){
+          logP += integrated_density(interval, lineageCount*(lineageCount-1.0)/2.0, U);
+        }
+        // sampling event
+        if (childCounts[indices[i]] == 0) {
+          lineageCount += 1.0;
+        }
+        // coalescent event
+        else {
+          lineageCount -= 1.0;
+        }
+        start = finish;
+      }
+      
+      return logP;
+    }}
+	"""
+
+	if heterochronous:
+		return integrated_constant_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
+	else:
+		return integrated_constant_coalescent_str.format('', '0')
 
 def skyride_coalescent(heterochronous):
 	skyride_coalescent_str = """
@@ -779,7 +849,13 @@ def get_model(params):
 				model_priors.append('heights ~ constant_coalescent(theta, map, lowers);')
 			else:
 				model_priors.append('heights ~ constant_coalescent(theta, map);')
-		elif params.coalescent == 'skyride':
+        elif params.coalescent == 'integrated':
+            functions_block.append(integrated_constant_coalescent(params.heterochronous))
+            if params.heterochronous:
+				model_priors.append('heights ~ integrated_constant_coalescent(map, 1000.0, lowers);') # picking u = 1E3
+            else:
+				model_priors.append('heights ~ integrated_constant_coalescent(map, 1000.0);')
+        elif params.coalescent == 'skyride':
 			functions_block.append(skyride_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
 			# functions_block.append(GMRF_time_aware(params.heterochronous))
@@ -798,7 +874,7 @@ def get_model(params):
 
 			model_priors.append('thetas ~ gmrf(tau);')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
-		elif params.coalescent == 'skygrid':
+        elif params.coalescent == 'skygrid':
 			functions_block.append(skygrid_coalescent(params.heterochronous))
 			functions_block.append(GMRF())
 
