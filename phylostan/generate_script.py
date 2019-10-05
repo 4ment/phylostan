@@ -157,16 +157,17 @@ def integrated_constant_coalescent(heterochronous=False):
       real finish;
       real interval;
       
+
       for( i in 1:nodeCount ){{
-        // internal node: transform
-        if(map[i, 1] > S){{
-          times[map[i, 1]] = heights[map[i, 1]-S];
-          childCounts[map[i, 1]] = 2;
-        }}
-        else{{
-          times[map[i, 1]] = lowers[map[i, 1]];
-          childCounts[map[i, 1]] = 0;
-        }}
+            // internal node: transform
+            if(map[i,1] > S){{
+                times[map[i,1]] = heights[map[i,1]-S];
+                childCounts[map[i,1]] = 2;
+            }}
+            else{{
+                times[map[i,1]] = {1};
+                childCounts[map[i,1]] = 0;
+            }}
       }}
       
       // calculate intervals
