@@ -9,6 +9,7 @@ import re
 
 env = Environment(ENV=os.environ)
 replicates = int(ARGUMENTS.get('replicates', 10))
+dry = bool(ARGUMENTS.get('dry', 0))
 
 phylostan = 'phylostan'
 physher = 'physher'
@@ -44,17 +45,18 @@ def run_physher(target, source, env):
             'DATA_TEMPLATE', aln_file_rel_path).replace('SEED', str(replicate))
         jsonf.write(json_local)
 
-    start = timer()
-    f = open(str(target[0]), 'w')
-    try:
-        check_call([physher, json_file], stdout=f, cwd=analysis_dir)
-    except subprocess.CalledProcessError as e:
-        print(e)
-        pass
-    end = timer()
-    total_time = end - start
-    f.write('TIME: {}'.format(total_time))
-    f.close()
+    if not dry:
+        start = timer()
+        f = open(str(target[0]), 'w')
+        try:
+            check_call([physher, json_file], stdout=f, cwd=analysis_dir)
+        except subprocess.CalledProcessError as e:
+            print(e)
+            pass
+        end = timer()
+        total_time = end - start
+        f.write('TIME: {}'.format(total_time))
+        f.close()
 
 
 def run_beast(target, source, env):
@@ -167,7 +169,10 @@ with open(join('DS1',  'DS1.trees'), 'r') as fp:
 
 stan_script = join('DS1', 'jc69.stan')
 stan_pkl = join('DS1', 'jc69.pkl')
-env.Command(stan_script, None, action='phylostan build -m JC69 -s $TARGET --compile')
+cmd = 'phylostan build -m JC69 -s $TARGET'
+if not dry:
+    cmd += ' --compile'
+env.Command(stan_script, None, action=cmd)
 outputs = []
 
 for replicate in range(replicates):
@@ -175,11 +180,12 @@ for replicate in range(replicates):
         # run Stan
         targets = ['', '.diag.txt']
         targets = [join('DS1', str(replicate), 'tree{}'.format(t) + target) for target in targets]
-        env.Command(target=targets,
-                    source=[join('DS1', 'DS1.nex'), join('DS1', 'trees', 'tree{}.tree'.format(t)), stan_script],
-                    action=run_stan,
-                    model=['-m', 'JC69'],
-                    extra=['--eta', '0.1'])
+        if not dry:
+            env.Command(target=targets,
+                        source=[join('DS1', 'DS1.nex'), join('DS1', 'trees', 'tree{}.tree'.format(t)), stan_script],
+                        action=run_stan,
+                        model=['-m', 'JC69'],
+                        extra=['--eta', '0.1'])
 
         # run physher
         physher_output = join('DS1', str(replicate), "tree" + str(t) + '.txt')
@@ -193,7 +199,8 @@ for replicate in range(replicates):
         outputs.extend((join('DS1', str(replicate), 'tree{}.diag.txt'.format(t)),
                         join('DS1', str(replicate), 'tree{}.txt'.format(t)),))
 
-env.Command(join('DS1', 'DS1.csv'), outputs, parse_DS1_results)
+if not dry:
+    env.Command(join('DS1', 'DS1.csv'), outputs, parse_DS1_results)
 
 
 datasets = {
@@ -223,20 +230,24 @@ for dataset in datasets:
     stan_script = join(dataset, dataset + '.stan')
 
     # VB
+    cmd = 'phylostan build -s $TARGET ' + datasets[dataset]['build']
+    if not dry:
+        cmd += ' --compile'
     env.Command(target=stan_script,
                 source=[seq_file, tree_file],
-                action='phylostan build --compile -s $TARGET ' + datasets[dataset]['build'])
+                action=cmd)
 
-    for replicate in range(1):
-        for q in 'meanfield', 'fullrank':
-            targets = ['', '.diag.txt']
-            targets = [join(dataset, str(replicate), q, dataset + target) for target in targets]
-            env.Command(target=targets,
-                        source=[seq_file, tree_file, stan_script],
-                        action=run_stan, model=datasets[dataset]['run'].split(' '),
-                        extra=['-q', q])
+    if not dry:
+        for replicate in range(1):
+            for q in 'meanfield', 'fullrank':
+                targets = ['', '.diag.txt']
+                targets = [join(dataset, str(replicate), q, dataset + target) for target in targets]
+                env.Command(target=targets,
+                            source=[seq_file, tree_file, stan_script],
+                            action=run_stan, model=datasets[dataset]['run'].split(' '),
+                            extra=['-q', q])
 
-            outputs.append(join(dataset, str(replicate), q, dataset + '.diag.txt'))
+                outputs.append(join(dataset, str(replicate), q, dataset + '.diag.txt'))
 
     # BEAST
     for replicate in range(3):
@@ -247,23 +258,24 @@ for dataset in datasets:
         env.Command(target=join(location, datasets[dataset]['input']),
                     source=sources,
                     action=Copy('$TARGET', '$SOURCE'))
-
-        env.Command(target=targets + [join(location, dataset + '.txt')],
-                    source=join(location, datasets[dataset]['input']),
-                    action=run_beast,
-                    beast=datasets[dataset]['beast'])
+        if not dry:
+            env.Command(target=targets + [join(location, dataset + '.txt')],
+                        source=join(location, datasets[dataset]['input']),
+                        action=run_beast,
+                        beast=datasets[dataset]['beast'])
 
     # NUTS
-    for replicate in range(3):
-        if nuts_chains == 1:
-            targets = ['_0.csv', '.diag.txt']
-        else:
-            targets = ['', '.diag.txt']
-        targets = [join(dataset, 'nuts', str(replicate), 'tree' + target) for target in targets]
-        env.Command(target=targets,
-                    source=[seq_file, tree_file, stan_script],
-                    action=run_stan,
-                    model=datasets[dataset]['run'].split(' '),
-                    extra=['-a', 'nuts', '--chain', str(nuts_chains)])
- 
-    env.Command(join(dataset, dataset + '.csv'), outputs, parse_results)
+    if not dry:
+        for replicate in range(3):
+            if nuts_chains == 1:
+                targets = ['_0.csv', '.diag.txt']
+            else:
+                targets = ['', '.diag.txt']
+            targets = [join(dataset, 'nuts', str(replicate), 'tree' + target) for target in targets]
+            env.Command(target=targets,
+                        source=[seq_file, tree_file, stan_script],
+                        action=run_stan,
+                        model=datasets[dataset]['run'].split(' '),
+                        extra=['-a', 'nuts', '--chain', str(nuts_chains)])
+    if not dry:
+        env.Command(join(dataset, dataset + '.csv'), outputs, parse_results)

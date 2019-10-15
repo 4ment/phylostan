@@ -486,7 +486,7 @@
 	
 
 	<!-- Define MCMC                                                             -->
-	<mcmc id="mcmc" chainLength="10000" autoOptimize="true" operatorAnalysis="hcv.ops">
+	<mcmc id="mcmc" chainLength="1000000000" autoOptimize="true" operatorAnalysis="hcv.ops">
 		<joint id="joint">
 			<prior id="prior">
 				<dirichletPrior alpha="1.0" sumsTo="6.0">
