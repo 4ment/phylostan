@@ -238,7 +238,7 @@ for dataset in datasets:
                 action=cmd)
 
     if not dry:
-        for replicate in range(1):
+        for replicate in range(10):
             for q in 'meanfield', 'fullrank':
                 targets = ['', '.diag.txt']
                 targets = [join(dataset, str(replicate), q, dataset + target) for target in targets]
@@ -271,11 +271,11 @@ for dataset in datasets:
                 targets = ['_0.csv', '.diag.txt']
             else:
                 targets = ['', '.diag.txt']
-            targets = [join(dataset, 'nuts', str(replicate), 'tree' + target) for target in targets]
+            targets = [join(dataset, str(replicate), 'nuts', dataset + target) for target in targets]
             env.Command(target=targets,
                         source=[seq_file, tree_file, stan_script],
                         action=run_stan,
                         model=datasets[dataset]['run'].split(' '),
-                        extra=['-a', 'nuts', '--chain', str(nuts_chains)])
+                        extra=['-a', 'nuts', '--chains', str(nuts_chains)])
     if not dry:
         env.Command(join(dataset, dataset + '.csv'), outputs, parse_results)
