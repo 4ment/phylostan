@@ -95,7 +95,7 @@ name="alignment">
 <map name="OneOnX" >beast.math.distributions.OneOnX</map>
 
 
-<run id="mcmc" spec="MCMC" chainLength="500">
+<run id="mcmc" spec="MCMC" chainLength="10000000">
     <state id="state" storeEvery="5000">
 <!-- 
         <tree id="Tree.t:fluA" name="stateNode">
