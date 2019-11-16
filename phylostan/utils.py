@@ -1,5 +1,4 @@
 import numpy
-import math
 
 def get_peeling_order(tree):
     peeling = []

@@ -76,8 +76,8 @@ def create_build_parser(subprasers, prog, help):
 	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'uncorrelated'], default=None,
 						help="""Type of clock""")
 	parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
-	parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
-						help="""Type of coalescent (constant or skyride)""")
+	parser.add_argument('-c', '--coalescent', choices=['constant', 'integrated', 'skyride', 'skygrid'], default=None,
+						help="""Type of coalescent (constant, integrated, skyride or skygrid)""")
 	parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 	parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
 	parser.add_argument('--compile', action="store_true", help="""Compile Stan script""")
