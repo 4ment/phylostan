@@ -135,13 +135,15 @@ def constant_coalescent(heterochronous=False):
 
 def integrated_constant_coalescent(heterochronous=False):
     integrated_constant_coalescent_str = """
-    real integrated_density(real t, real kappa, real u){{
-      real z = kappa*t;
-      real w = square(z + u);
-      real lnum  = log(2*w*log(u + z) + 3*square(z) + 4*u*z - w*(2*log(z) + 3));
-      real ldenom = log(2) + log(w);  
-      return(log(2) + log(kappa) +  lnum - ldenom -log(u));
-    }}  
+    real integrated_density(real t, real s, real u){{
+        real ch = (square(s) -s)/2;
+        real lc1 = log(2) + log(ch) -log(u);
+        real c2 = ch*t;
+        real Fu = log(u + c2) + (4*c2*u + 3*square(c2))/(2*square(u + c2));
+        real Fzero = log(c2) + 3.0/2;
+        real ans = lc1 + log(Fu-Fzero);
+        return(ans);
+      }}  
     real integrated_constant_coalescent_log(real[] heights, real U, int[,] map{0}){{
       int S = size(heights) + 1; // number of leaves from the number of internal nodes
       int nodeCount = size(heights) + S;
@@ -182,7 +184,7 @@ def integrated_constant_coalescent(heterochronous=False):
         interval = finish - start;
         
         if(interval != 0.0 && childCounts[indices[i]] != 0 ){{
-          logP += integrated_density(interval, lineageCount*(lineageCount-1.0)/2.0, U);
+          logP += integrated_density(interval, lineageCount, U);
         }}
         // sampling event
         if (childCounts[indices[i]] == 0) {{
