@@ -1,5 +1,60 @@
 import numpy
-import math
+import csv
+
+
+def setup_dates(tree, dates=None, heterochronous=False):
+    # if a date file is provided then it is heterochronous
+    if dates:
+        heterochronous = True
+
+    # parse dates
+    if heterochronous:
+        dates = {}
+        if dates:
+            with dates as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    dates[row['name']] = float(row['date'].strip())
+        else:
+            for node in tree.leaf_node_iter():
+                dates[str(node.taxon)] = float(str(node.taxon).split('_')[-1][:-1])
+
+        max_date = max(dates.values())
+        min_date = min(dates.values())
+
+        # time starts at 0
+        if min_date == 0:
+            for node in tree.leaf_node_iter():
+                node.date = dates[str(node.taxon)]
+            oldest = max_date
+        # time is a year
+        else:
+            for node in tree.leaf_node_iter():
+                node.date = max_date - dates[str(node.taxon)]
+            oldest = max_date - min_date
+    else:
+        for node in tree.postorder_node_iter():
+            node.date = 0.0
+        oldest = None
+
+    return oldest
+
+
+def setup_indexes(tree):
+    for node in tree.postorder_node_iter():
+        node.index = -1
+        node.annotations.add_bound_attribute("index")
+
+    s = len(tree.taxon_namespace) + 1
+    taxa_dict = {taxon.label: idx for idx, taxon in enumerate(tree.taxon_namespace)}
+
+    for node in tree.postorder_node_iter():
+        if not node.is_leaf():
+            node.index = s
+            s += 1
+        else:
+            node.index = taxa_dict[node.taxon.label] + 1
+
 
 def get_peeling_order(tree):
     peeling = []
@@ -213,15 +268,15 @@ def parse_log(inputfile, alpha=0.05):
                 for i in range(6):
                     d = data[header.index('rates.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.3E} 95% CI: ({:.3E},{:.3E})'.format(GTR[i], mean, low, high))
+                    print('  {} mean: {:.3E} {}% CI: ({:.3E},{:.3E})'.format(1-alpha, GTR[i], mean, (1-alpha)*100, low, high))
                 for i in range(4):
                     d = data[header.index('freqs.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.4f} 95% CI: ({:.4f},{:.4f})'.format(frequencies[i], mean, low, high))
+                    print('  {} mean: {:.4f} {}% CI: ({:.4f},{:.4f})'.format(frequencies[i], mean, (1-alpha)*100, low, high))
             elif var in variables:
                 d = data[header.index(var)]
                 mean, median, low, high = descriptive_stats(d, alpha)
-                print('{} mean: {} 95% CI: ({},{})'.format(variables[var], mean, low, high))
+                print('{} mean: {} {}% CI: ({},{})'.format(variables[var], mean, (1-alpha)*100, low, high))
 
             # time tree
         if 'heights.1' in header:
@@ -233,7 +288,7 @@ def parse_log(inputfile, alpha=0.05):
                     max_height = data[idx][0]
             d = data[index_root_height]
             mean, median, low, high = descriptive_stats(d, alpha)
-            print('Root height mean: {} 95% CI: ({},{})'.format(mean, low, high))
+            print('Root height mean: {} {}% CI: ({},{})'.format(mean, (1-alpha)*100, low, high))
         else:
             indexes = []
             for idx, h in enumerate(header):
@@ -246,5 +301,5 @@ def parse_log(inputfile, alpha=0.05):
                     sum_blens += data[idx][row]
                 sums.append(sum_blens)
             mean, median, low, high = descriptive_stats(sums, alpha)
-            print('Tree length mean: {} 95% CI: ({},{})'.format(mean, low, high))
+            print('Tree length mean: {} {}% CI: ({},{})'.format(mean, (1-alpha)*100, low, high))
 
