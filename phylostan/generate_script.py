@@ -1,4 +1,19 @@
 
+def get_delta_rates():
+	str = '''
+	{
+		int nodeCount = 2*S - 1;
+		int idx = 1;
+		// no rate at root and rate of first child has a different prior
+		for(i in 3:nodeCount){
+			deltas[idx] = substrates[map[i,1]] - substrates[map[2,1]];
+			idx = idx + 1;
+		}
+	}
+	'''
+	return str
+
+
 def autocorrelated_prior(heterochronous):
 	str = '''
 	real logn_autocorrelated_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
@@ -753,7 +768,16 @@ def get_model(params):
 				# model_priors.append('substrates ~ lognormal(mu, sigma);')
 				# model_priors.append('mu ~ exponential(1000);')
 				# model_priors.append('sigma ~ gamma(0.5396, 2.6184);')
-
+			elif params.clock == 'horseshoe':
+				transformed_parameters_declarations.append('real deltas[2*S-3];')
+				transformed_parameters_block.append(get_delta_rates())
+				parameters_block.append('real <lower=0> zeta;')
+				parameters_block.append('vector<lower=0>[2*S-3] gammas;')
+				parameters_block.append('real <lower=0.001, upper=0.01> substrates[2*S-2];')
+				model_priors.append('deltas ~ normal(0, zeta*gammas);')
+				model_priors.append('gammas ~ cauchy(0, 1);')
+				model_priors.append('zeta ~ cauchy(0, 0.01);')
+				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
 		else:
 			data_block.append('real <lower=0> rate;')
 

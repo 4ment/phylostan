@@ -77,7 +77,7 @@ def create_build_parser(subprasers, prog, help):
 						help="""Weibull or discrete distribution to model rate heterogeneity across sites""")
 	parser.add_argument('--heterochronous', action="store_true",
 						help="""Heterochronous data. Expect a date in the leaf names""")
-	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'uncorrelated'], default=None,
+	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'uncorrelated', 'horseshoe'], default=None,
 						help="""Type of clock""")
 	parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 	parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
