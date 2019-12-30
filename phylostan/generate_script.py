@@ -1,4 +1,27 @@
 
+def birth_death():
+	str ='''
+	real birth_death_log(real[] heights, int[,] map, real rho, real a, real r){
+		int S = size(heights) + 1;
+		int nodeCount = S + size(heights);
+		real logP = 0;
+		for(i in 1:nodeCount){
+			if(map[i,1] > S){
+				real mrh = -r*heights[map[i,1]-S];
+				real z = log(rho + ((1.0 - rho) - a)*exp(mrh));
+				logP += -2.0 * z + mrh;
+				if(map[i,1] == 1){
+					logP += mrh - z;
+				}
+			}
+		}
+		logP += (S - 1) * log(r*rho) + nodeCount*log(1.0 - a);
+		return logP;
+	}
+	'''
+	return str
+
+
 def get_delta_rates():
 	str = '''
 	{
@@ -760,14 +783,18 @@ def get_model(params):
 				else:
 					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu);')
 				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-			elif params.clock == 'uncorrelated':
-				# parameters_block.append('real <lower=0> mu;')
-				# parameters_block.append('real <lower=0> sigma;')
+			elif params.clock == 'ucln':
+				parameters_block.append('real <lower=0> mu;')
+				parameters_block.append('real <lower=0> sigma;')
 				parameters_block.append('real <lower=0> substrates[2*S-2];')
-				model_priors.append('substrates ~ exponential(1000);')
-				# model_priors.append('substrates ~ lognormal(mu, sigma);')
-				# model_priors.append('mu ~ exponential(1000);')
-				# model_priors.append('sigma ~ gamma(0.5396, 2.6184);')
+				model_priors.append('substrates ~ lognormal(mu, sigma);')
+				model_priors.append('mu ~ exponential(1000);')
+				model_priors.append('sigma ~ gamma(0.5396, 2.6184);')
+			elif params.clock == 'uced':
+				parameters_block.append('real <lower=0> lambda;')
+				parameters_block.append('real <lower=0> substrates[2*S-2];')
+				model_priors.append('substrates ~ exponential(lambda);')
+				model_priors.append('lambda ~ exponential(1000);')
 			elif params.clock == 'horseshoe':
 				transformed_parameters_declarations.append('real deltas[2*S-3];')
 				transformed_parameters_block.append(get_delta_rates())
@@ -841,6 +868,12 @@ def get_model(params):
 	else:
 		parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
 		model_priors.append('blens ~ exponential(10);')
+
+	if params.speciation == 'bd':
+		functions_block.append(birth_death())
+		parameters_block.append('real<lower=0> netDiversificationRate ;') # lambda-mu
+		parameters_block.append('real<lower=0, upper=1> relativeExtinctionRate;') # mu/lambda
+		model_priors.append('heights ~ birth_death(map, 1, netDiversificationRate, relativeExtinctionRate);')
 
 	# Substitution model
 	if params.model == 'GTR':

@@ -250,7 +250,9 @@ def parse_log(inputfile, alpha=0.05):
         'kappa': 'HKY (kappa)',
         'rate': 'Strict clock (rate)',
         'theta': 'Constant population size (theta)',
-        'tau': 'GMRF precision (tau)'
+        'tau': 'GMRF precision (tau)',
+        'netDiversificationRate': 'net diversification rate',
+        'relativeExtinctionRate': 'relative extinction rate'
     }
     with open(inputfile) as fp:
         for line in fp:
@@ -268,7 +270,7 @@ def parse_log(inputfile, alpha=0.05):
                 for i in range(6):
                     d = data[header.index('rates.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.3E} {}% CI: ({:.3E},{:.3E})'.format(1-alpha, GTR[i], mean, (1-alpha)*100, low, high))
+                    print('  {} mean: {:.3E} {}% CI: ({:.3E},{:.3E})'.format(GTR[i], mean, (1-alpha)*100, low, high))
                 for i in range(4):
                     d = data[header.index('freqs.'+str(i+1))]
                     mean, median, low, high = descriptive_stats(d, alpha)

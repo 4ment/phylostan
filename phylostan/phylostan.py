@@ -77,11 +77,13 @@ def create_build_parser(subprasers, prog, help):
 						help="""Weibull or discrete distribution to model rate heterogeneity across sites""")
 	parser.add_argument('--heterochronous', action="store_true",
 						help="""Heterochronous data. Expect a date in the leaf names""")
-	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'uncorrelated', 'horseshoe'], default=None,
+	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'ucln', 'uced', 'horseshoe'], default=None,
 						help="""Type of clock""")
 	parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 	parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
 						help="""Type of coalescent (constant or skyride)""")
+	parser.add_argument('--speciation', choices=['bd', 'yule'], default=None,
+						help="""Speciation model (birth-death or Yule)""")
 	parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 	parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
 	parser.add_argument('--compile', action="store_true", help="""Compile Stan script""")
