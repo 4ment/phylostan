@@ -1,6 +1,6 @@
 
 def birth_death():
-	str ='''
+	code_str = '''
 	real birth_death_log(real[] heights, int[,] map, real rho, real a, real r){
 		int S = size(heights) + 1;
 		int nodeCount = S + size(heights);
@@ -19,26 +19,57 @@ def birth_death():
 		return logP;
 	}
 	'''
-	return str
+	return code_str
 
 
 def get_delta_rates():
-	str = '''
+	code_str = '''
 	{
-		int nodeCount = 2*S - 1;
-		int idx = 1;
 		// no rate at root and rate of first child has a different prior
 		for(i in 3:nodeCount){
-			deltas[idx] = substrates[map[i,1]] - substrates[map[2,1]];
-			idx = idx + 1;
+			if(map[i,2] == nodeCount){
+				deltas[map[i,1]] = substrates[map[i,1]] - substrates[map[2,1]];
+			}
+			else{
+				deltas[map[i,1]] = substrates[map[i,1]] - substrates[map[i,2]];
+			}
 		}
 	}
 	'''
-	return str
+	return code_str
+
+
+def get_rates_from_deltas():
+	"""
+	Create substrates from deltas and rate.
+	Used by MRF
+	"""
+	code_str = '''
+	{
+		// no rate at root and rate of first child has a different prior
+		substrates[map[2,1]] = rate;
+		for(i in 3:nodeCount){
+			if(map[i,2] == nodeCount){
+				substrates[map[i,1]] = exp(deltas[i-2] + log(rate));
+			}
+			else{
+				substrates[map[i,1]] = exp(deltas[i-2] + log(substrates[map[i,2]]));
+			}
+		}
+	}
+	'''
+	return code_str
 
 
 def autocorrelated_prior(heterochronous):
-	str = '''
+	"""
+	Thorne et al 1998
+	mu_i = log(r_a)
+	sigma_i = nu*t_i
+
+	log(r_i) ~ N(mu_i, sigma_i^2)
+	"""
+	code_str = '''
 	real logn_autocorrelated_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
 		int S = size(heights) + 1;
 		int nodeCount = S + size(heights);
@@ -58,6 +89,152 @@ def autocorrelated_prior(heterochronous):
 			}}
 			else{{
 				logP += normal_lpdf(log(rates[map[i,1]]) | log(rates[map[i,2]]), nu*(heights[map[i,2]-S]{1})/2.0);
+			}}
+		}}
+		return logP;
+	}}
+'''
+	if heterochronous:
+		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+	else:
+		return code_str.format('', '')
+
+
+def acln_prior(heterochronous):
+	"""
+	Kishino et al 2001 autocorrelated lognormal model
+
+	sigma_i = (nu*t_i)^1/2
+	E[r_i|r_a] = r_a = e^{mu_i + sigma_i^2/2}
+	mu_i = log(r_a) - nu*t_i/2
+
+	r_i ~ LN(mu_i, sigma_i)
+	"""
+	code_str = '''
+	real acln_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
+		int S = size(heights) + 1;
+		int nodeCount = S + size(heights);
+		real logP = 0.0;
+		// no rate at root and rate of first child has a different distribution
+		for(i in 3:nodeCount){{
+			if(map[i,2] == nodeCount){{
+				if(map[i,1] > S){{
+					logP += lognormal_lpdf(rates[map[i,1]] | log(rates[map[2,1]]) - nu*(heights[map[i,2]-S] - heights[map[i,1]-S])/2.0, sqrt(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])));
+				}}
+				else{{
+					logP += lognormal_lpdf(rates[map[i,1]] | log(rates[map[2,1]]) - nu*(heights[map[i,2]-S]{1})/2.0, sqrt(nu*(heights[map[i,2]-S]{1})));
+				}}
+			}}
+			else if(map[i,1] > S){{
+				logP += lognormal_lpdf(rates[map[i,1]] | log(rates[map[i,2]]) - nu*(heights[map[i,2]-S] - heights[map[i,1]-S])/2.0, sqrt(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])));
+			}}
+			else{{
+				logP += lognormal_lpdf(rates[map[i,1]] | log(rates[map[i,2]]) - nu*(heights[map[i,2]-S]{1})/2.0, sqrt(nu*(heights[map[i,2]-S]{1})));
+			}}
+		}}
+		return logP;
+	}}
+'''
+	if heterochronous:
+		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+	else:
+		return code_str.format('', '')
+
+
+def acg_prior(heterochronous):
+	"""
+	Aris-Brosou and Yang 2002 autocorrelated gamma model
+
+	E[r_i|r_a] = r_a = shape_i/rate_i
+	Var[r_i|r_a] = nu*t_i = shape_i/rate_i^2
+
+	shape_i = r_a^2/(nu*t_i)
+	rate_i = r_a/(nu*t_i)
+
+	r_i ~ Gamma(shape_i, rate_i)
+	"""
+	code_str = '''
+	real acg_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
+		int S = size(heights) + 1;
+		int nodeCount = S + size(heights);
+		real logP = 0.0;
+		// no rate at root and rate of first child is exponentialy distributed
+		for(i in 3:nodeCount){{
+			if(map[i,2] == nodeCount){{
+				if(map[i,1] > S){{
+					logP += gamma_lpdf(rates[map[i,1]] | rates[map[2,1]]*rates[map[2,1]]/(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])), rates[map[2,1]]/(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])));
+				}}
+				else{{
+					logP += gamma_lpdf(rates[map[i,1]] | rates[map[2,1]]*rates[map[2,1]]/(nu*(heights[map[i,2]-S]{1})), rates[map[2,1]]/(nu*(heights[map[i,2]-S]{1})));
+				}}
+			}}
+			else if(map[i,1] > S){{
+				logP += gamma_lpdf(rates[map[i,1]] | rates[map[i,2]]*rates[map[i,2]]/(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])), rates[map[i,2]]/(nu*(heights[map[i,2]-S] - heights[map[i,1]-S])));
+			}}
+			else{{
+				logP += gamma_lpdf(rates[map[i,1]] | rates[map[i,2]]*rates[map[i,2]]/(nu*(heights[map[i,2]-S]{1})), rates[map[i,2]]/(nu*(heights[map[i,2]-S]{1})));
+			}}
+		}}
+		return logP;
+	}}
+'''
+	if heterochronous:
+		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+	else:
+		return code_str.format('', '')
+
+
+def ace_prior():
+	"""
+	Aris-Brosou and Yang 2002 autocorrelated exponential model
+	E[r_i] = r_a
+
+	r_i ~ Exp(1/r_a)
+	"""
+	code_str = '''
+	real ace_log(real[] rates, int[,] map){
+		int nodeCount = size(rates) + 1;
+		real logP = 0.0;
+		// no rate at root and rate of first child is exponentialy distributed
+		for(i in 3:nodeCount){
+			if(map[i,2] == nodeCount){
+				logP += exponential_lpdf(rates[map[i,1]] | 1.0/rates[map[2,1]]);
+			}
+			else{
+				logP += exponential_lpdf(rates[map[i,1]] | 1.0/rates[map[i,2]]);
+			}
+		}
+		return logP;
+	}
+'''
+	return code_str
+
+
+def aoup_prior(heterochronous):
+	'''
+	Aris-Brous & Yang 2002 Ornstein-Uhlenbeck process
+	nu is sigma^2
+	'''
+	str = '''
+	real aoup_log(real[] rates, real[] heights, int[,] map, real beta, real nu{0}){{
+		int S = size(heights) + 1;
+		int nodeCount = S + size(heights);
+		real logP = 0.0;
+		real deltaT;
+		// no rate at root and rate of first child is exponentialy distributed
+		for(i in 3:nodeCount){{
+			if(map[i,1] > S){{
+				deltaT = heights[map[i,2]-S] - heights[map[i,1]-S];
+			}}
+			else{{
+				deltaT = heights[map[i,2]-S]{1};
+			}}
+
+			if(map[i,2] == nodeCount){{
+				logP += normal_lpdf(rates[map[i,1]] | rates[map[2,1]]*exp(-beta*deltaT), sqrt(nu*(1.0 - exp(-2.0*beta*deltaT))/(2.0*beta)));
+			}}
+			else{{
+				logP += normal_lpdf(rates[map[i,1]] | rates[map[i,1]]*exp(-beta*deltaT), sqrt(nu*(1.0 - exp(-2.0*beta*deltaT))/(2.0*beta)));
 			}}
 		}}
 		return logP;
@@ -380,7 +557,7 @@ def GMRF_time_aware(heterochronous):
 def heights_to_blens(heterochronous=False, strict=True):
 	model_heights_to_blens = """
 	// populate blens from heights array in preorder
-	for( j in 2:(bcount+1) ){{
+	for( j in 2:nodeCount ){{
 		// internal node
 		if(map[j,1] > S){{
 			blens[map[j,1]] = rate*(heights[map[j,2]-S] - heights[map[j,1]-S]);
@@ -397,6 +574,36 @@ def heights_to_blens(heterochronous=False, strict=True):
 	if not strict:
 		return model_heights_to_blens.replace('rate', 'substrates[map[j,1]]')
 	return model_heights_to_blens
+
+
+def heights_to_blens_autocorr(heterochronous=False):
+	model_heights_to_blens = """
+	// populate blens from heights array in preorder
+	for( j in 2:nodeCount ){{
+		if(map[j,1] > S){{
+			blens[map[j,1]] = heights[map[j,2]-S] - heights[map[j,1]-S];
+		}}
+		else{{
+			blens[map[j,1]] = heights[map[j,2]-S]{};
+		}}
+	}}
+	
+	blens[map[2,1]] *= substrates[map[2,1]];
+	for( j in 3:nodeCount ){{
+		if(map[j,2] == nodeCount){{
+			blens[map[j,1]] *= 0.5*(substrates[map[j,1]] + substrates[map[2,1]]);
+		}}
+		else{{
+			blens[map[j,1]] *= 0.5*(substrates[map[j,1]] + substrates[map[j,2]]);
+		}}
+	}}
+"""
+	if heterochronous:
+		model_heights_to_blens = model_heights_to_blens.format(' - lowers[map[j,1]]')
+	else:
+		model_heights_to_blens = model_heights_to_blens.format('')
+	return model_heights_to_blens
+
 	
 def transform_heights(heterochronous=False):
 	transform_str = """
@@ -429,7 +636,7 @@ def transform_heights(heterochronous=False):
 def jacobian(heterochronous=False):
 	log_det_jacobian = """
 	// add log det jacobian
-	for( i in 2:(bcount+1) ){{
+	for( i in 2:nodeCount ){{
 		// skip leaves
 		if(map[i,1] > S ){{
 			target += log(heights[map[i,2]-S]{});
@@ -711,6 +918,7 @@ def get_model(params):
 	else:
 		data_block.append('int map[2*S-1,2];                     // list of node in preorder [node,parent]')
 		transformed_data_declarations.append('int bcount = 2*S-2; // number of branches')
+	transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
 
 	# Site model
 	if params.invariant or params.categories > 1:
@@ -774,37 +982,65 @@ def get_model(params):
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
 				model_priors.append('rate ~ exponential(1000);')
-			elif params.clock == 'autocorrelated':
-				parameters_block.append('real <lower=0> nu;')
-				parameters_block.append('real <lower=0.001, upper=0.01> substrates[2*S-2];')
-				functions_block.append(autocorrelated_prior(params.heterochronous))
-				if params.heterochronous:
-					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu, lowers);')
-				else:
-					model_priors.append('substrates ~ logn_autocorrelated(heights, map, nu);')
-				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-			elif params.clock == 'ucln':
-				parameters_block.append('real <lower=0> mu;')
-				parameters_block.append('real <lower=0> sigma;')
-				parameters_block.append('real <lower=0> substrates[2*S-2];')
-				model_priors.append('substrates ~ lognormal(mu, sigma);')
-				model_priors.append('mu ~ exponential(1000);')
-				model_priors.append('sigma ~ gamma(0.5396, 2.6184);')
-			elif params.clock == 'uced':
-				parameters_block.append('real <lower=0> lambda;')
-				parameters_block.append('real <lower=0> substrates[2*S-2];')
-				model_priors.append('substrates ~ exponential(lambda);')
-				model_priors.append('lambda ~ exponential(1000);')
-			elif params.clock == 'horseshoe':
-				transformed_parameters_declarations.append('real deltas[2*S-3];')
-				transformed_parameters_block.append(get_delta_rates())
+			elif params.clock.endswith('mrf'):
+				transformed_parameters_declarations.append('real substrates[bcount];')
+				parameters_block.append('real deltas[2*S-3];')
+				parameters_block.append('real<lower=0> rate;')
+				transformed_parameters_block.append(get_rates_from_deltas())
 				parameters_block.append('real <lower=0> zeta;')
-				parameters_block.append('vector<lower=0>[2*S-3] gammas;')
-				parameters_block.append('real <lower=0.001, upper=0.01> substrates[2*S-2];')
-				model_priors.append('deltas ~ normal(0, zeta*gammas);')
-				model_priors.append('gammas ~ cauchy(0, 1);')
-				model_priors.append('zeta ~ cauchy(0, 0.01);')
-				model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+				if params.clock == 'hsmrf':
+					parameters_block.append('vector<lower=0>[bcount-1] gammas;') # local scales
+					model_priors.append('deltas ~ normal(0, zeta*gammas*0.0014);') # global scale
+					model_priors.append('gammas ~ cauchy(0, 1);')
+				elif params.clock == 'gmrf':
+					model_priors.append('deltas ~ normal(0, zeta*0.0014);')
+				model_priors.append('zeta ~ cauchy(0, 1);')
+				model_priors.append('rate ~ exponential(1000);')
+			else:
+				parameters_block.append('real <lower=0> substrates[bcount];')
+				if params.clock == 'ace':
+					functions_block.append(ace_prior())
+					model_priors.append('substrates ~ ace(map);')
+					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+				elif params.clock == 'acln':
+					parameters_block.append('real <lower=0> nu;')
+					functions_block.append(acln_prior(params.heterochronous))
+					model_priors.append('nu ~ exponential(1);')
+					if params.heterochronous:
+						model_priors.append('substrates ~ acln(heights, map, nu, lowers);')
+					else:
+						model_priors.append('substrates ~ acln(heights, map, nu);')
+					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+				elif params.clock == 'acg':
+					parameters_block.append('real <lower=0> nu;')
+					functions_block.append(acg_prior(params.heterochronous))
+					model_priors.append('nu ~ exponential(1);')
+					if params.heterochronous:
+						model_priors.append('substrates ~ acg(heights, map, nu, lowers);')
+					else:
+						model_priors.append('substrates ~ acg(heights, map, nu);')
+					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+				elif params.clock == 'aoup':
+					parameters_block.append('real <lower=0> beta;')
+					parameters_block.append('real <lower=0> sigma;')
+					functions_block.append(aoup_prior(params.heterochronous))
+					if params.heterochronous:
+						model_priors.append('substrates ~ aoup(heights, map, beta, sigma, lowers);')
+					else:
+						model_priors.append('substrates ~ aoup(heights, map, beta, sigma);')
+					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+				elif params.clock == 'ucln':
+					parameters_block.append('real <lower=0> ucln_mean;')
+					parameters_block.append('real <lower=0> ucln_stdev;')
+					#model_priors.append('substrates ~ lognormal(log(ucln_mean/sqrt(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))), sqrt(log(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))));')
+					model_priors.append('substrates ~ lognormal(log(ucln_mean)-ucln_stdev*ucln_stdev*0.5, ucln_stdev);')
+					model_priors.append('ucln_mean ~ exponential(1000);')
+					model_priors.append('ucln_stdev ~ gamma(0.5396, 2.6184);')
+					# model_priors.append('ucln_stdev ~ exponential(3);')
+				elif params.clock == 'uced':
+					parameters_block.append('real <lower=0> uced_mean;')
+					model_priors.append('substrates ~ exponential(1.0/uced_mean);')
+					model_priors.append('uced_mean ~ exponential(1000);')
 		else:
 			data_block.append('real <lower=0> rate;')
 
@@ -818,7 +1054,10 @@ def get_model(params):
 			parameters_block.append('real<lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map);')
 
-		model_block.append(heights_to_blens(params.heterochronous, params.clock == 'strict' or not params.estimate_rate))
+		if params.clock in ('acln', 'acg', 'ace', 'aoup', 'hsmrf', 'gmrf'):
+			model_block.append(heights_to_blens_autocorr(params.heterochronous))
+		else:
+			model_block.append(heights_to_blens(params.heterochronous, params.clock == 'strict' or not params.estimate_rate))
 
 		# Coalescent
 		if params.coalescent == 'constant':
@@ -930,8 +1169,10 @@ def get_model(params):
 	
 	if len(transformed_data_declarations) != 0:
 		script += 'transformed data{\n'
-		script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n\n'
-		script += '\t' + '\n\t'.join(transformed_data_block) + '\n}\n\n'
+		script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
+		if len(transformed_data_block) > 0:
+			script += '\t' + '\n\t'.join(transformed_data_block) + '\n'
+		script += '}\n\n'
 
 	script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
 	

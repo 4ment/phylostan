@@ -77,7 +77,8 @@ def create_build_parser(subprasers, prog, help):
 						help="""Weibull or discrete distribution to model rate heterogeneity across sites""")
 	parser.add_argument('--heterochronous', action="store_true",
 						help="""Heterochronous data. Expect a date in the leaf names""")
-	parser.add_argument('--clock', required=False, choices=['strict', 'autocorrelated', 'ucln', 'uced', 'horseshoe'], default=None,
+	parser.add_argument('--clock', required=False,
+						choices=['strict', 'ace', 'acln', 'acg', 'aoup', 'ucln', 'uced', 'gmrf', 'hsmrf'], default=None,
 						help="""Type of clock""")
 	parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 	parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
@@ -119,7 +120,7 @@ def main():
 
 def parse_logs(treeobj, treelog, samplelog, rate, alpha):
 	utils.convert_samples_to_nexus(treeobj, samplelog, treelog, rate)
-	utils.parse_log(samplelog, alpha)
+	utils.parse_log(samplelog, alpha, treeobj)
 
 
 def parse(arg):

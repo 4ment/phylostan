@@ -240,7 +240,7 @@ def descriptive_stats(d, alpha):
     return numpy.mean(d), median, low, high
 
 
-def parse_log(inputfile, alpha=0.05):
+def parse_log(inputfile, alpha=0.05, tree=None):
     data = []
     GTR = ('AC', 'AG', 'AT', 'CG', 'CT', 'GC')
     frequencies = 'A', 'C', 'G', 'T'
@@ -252,7 +252,9 @@ def parse_log(inputfile, alpha=0.05):
         'theta': 'Constant population size (theta)',
         'tau': 'GMRF precision (tau)',
         'netDiversificationRate': 'net diversification rate',
-        'relativeExtinctionRate': 'relative extinction rate'
+        'relativeExtinctionRate': 'relative extinction rate',
+        'ucln_mean': 'UCLN mean',
+        'ucln_stdev': 'UCLN stdev'
     }
     with open(inputfile) as fp:
         for line in fp:
@@ -276,9 +278,10 @@ def parse_log(inputfile, alpha=0.05):
                     mean, median, low, high = descriptive_stats(d, alpha)
                     print('  {} mean: {:.4f} {}% CI: ({:.4f},{:.4f})'.format(frequencies[i], mean, (1-alpha)*100, low, high))
             elif var in variables:
-                d = data[header.index(var)]
-                mean, median, low, high = descriptive_stats(d, alpha)
-                print('{} mean: {} {}% CI: ({},{})'.format(variables[var], mean, (1-alpha)*100, low, high))
+                if 'substrates.1' not in header or var != 'rate':
+                    d = data[header.index(var)]
+                    mean, median, low, high = descriptive_stats(d, alpha)
+                    print('{} mean: {} {}% CI: ({},{})'.format(variables[var], mean, (1-alpha)*100, low, high))
 
             # time tree
         if 'heights.1' in header:
@@ -291,6 +294,33 @@ def parse_log(inputfile, alpha=0.05):
             d = data[index_root_height]
             mean, median, low, high = descriptive_stats(d, alpha)
             print('Root height mean: {} {}% CI: ({},{})'.format(mean, (1-alpha)*100, low, high))
+            if tree is not None and 'substrates.1' in header:
+                rindex = header.index('substrates.1')
+                hindex = header.index('heights.1')
+                taxaCount = len(tree.taxon_namespace)
+                d = []
+                rates = []
+                variances = []
+                for i in range(len(data[0])):
+                    for n in tree.postorder_node_iter():
+                        if not n.is_leaf():
+                            n.date = data[hindex + n.index - taxaCount - 1][i]
+                        if n.parent_node is not None:
+                            n.rate = data[rindex + n.index - 1][i]
+                            rates.append(n.rate)
+                    sum_distance = 0
+                    sum_time = 0
+                    for n in tree.postorder_node_iter():
+                        if n.parent_node is not None:
+                            edge_length = n.parent_node.date - n.date
+                            sum_distance += n.rate * edge_length
+                            sum_time += edge_length
+                    d.append(sum_distance/sum_time)
+                    variances.append(numpy.var(rates))
+                mean, median, low, high = descriptive_stats(d, alpha)
+                print('Mean rate mean: {} {}% CI: ({},{})'.format(mean, (1 - alpha) * 100, low, high))
+                mean, median, low, high = descriptive_stats(variances, alpha)
+                print('Variance rate mean: {} {}% CI: ({},{})'.format(mean, (1 - alpha) * 100, low, high))
         else:
             indexes = []
             for idx, h in enumerate(header):
