@@ -30,7 +30,7 @@ def create_parse_parser(subprasers):
 def create_run_parser(subprasers):
 	parser = create_build_parser(subprasers, 'run', help='run an analysis using a Stan script')
 	parser.add_argument('-t', '--tree', type=argparse.FileType('r'), required=True, help="""Tree file""")
-	parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=True, help="""Sequence file""")
+	parser.add_argument('-i', '--input', type=argparse.FileType('r'), required=False, help="""Sequence file""")
 	parser.add_argument('-o', '--output', required=True, help="""Stem for output files""")
 	parser.add_argument('--lower_root', type=float, default=0.0, help="""Lower bound of the root""")
 	parser.add_argument('--rate', required=False, type=float, help="""Substitution rate""")
@@ -61,6 +61,8 @@ def create_run_parser(subprasers):
 	parser.add_argument('--iter', required=False, type=int, default=100000,
 						help="""Maximum number of iterations for variational inference or number of iterations for NUTS 
 						and HMC algorithms""")
+	parser.add_argument('-M', '--metadata', help="""Phylogeography metadata file""")
+	parser.add_argument('--metadata_key', help="""Phylogeography: use key in metadadeta""")
 	return parser
 
 
@@ -88,6 +90,8 @@ def create_build_parser(subprasers, prog, help):
 	parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 	parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
 	parser.add_argument('--compile', action="store_true", help="""Compile Stan script""")
+	parser.add_argument('--geo', action="store_true", help="""Phylogeography""")
+	parser.add_argument('--rescaling_geo', action="store_true", help="""Use rescaling phylogeography""")
 	return parser
 
 
@@ -167,34 +171,86 @@ def run(arg):
 
 	tree = Tree.get(file=arg.tree, schema=tree_format, tree_offset=0, taxon_namespace=taxa, preserve_underscores=True,
 					rooting='force-rooted')
-	if len(tree.seed_node.adjacent_nodes()) > 2:
-		tree.reroot_at_edge(tree.seed_node.adjacent_nodes()[0].edge)
 
-	seqs_args = dict(schema='nexus', preserve_underscores=True)
-	with open(arg.input.name) as fp:
-		if next(fp).startswith('>'):
-			seqs_args = dict(schema='fasta')
-
-	dna = DnaCharacterMatrix.get(file=arg.input, taxon_namespace=taxa, **seqs_args)
-	alignment_length = dna.sequence_size
-	sequence_count = len(dna)
-	if sequence_count != len(dna.taxon_namespace):
-		sys.stderr.write('taxon names in trees and alignment are different')
-		exit(2)
-
-	print('Number of sequences: {} length {} '.format(sequence_count, alignment_length))
-	print('Model: ' + arg.model)
-
-	tipdata, weights = utils.get_dna_leaves_partials_compressed(dna)
-	alignment_length = len(weights)
+	tree.resolve_polytomies(update_bipartitions=True)
 
 	utils.setup_indexes(tree)
 
 	oldest = utils.setup_dates(tree, arg.dates, arg.heterochronous)
 
 	peeling = utils.get_peeling_order(tree)
+	sequence_count = len(tree.taxon_namespace)
+	data = {'peel': peeling, 'S': sequence_count}
 
-	data = {'peel': peeling, 'tipdata': tipdata, 'L': alignment_length, 'S': sequence_count, 'weights': weights}
+	if arg.input:
+		seqs_args = dict(schema='nexus', preserve_underscores=True)
+		with open(arg.input.name) as fp:
+			if next(fp).startswith('>'):
+				seqs_args = dict(schema='fasta')
+
+		dna = DnaCharacterMatrix.get(file=arg.input, taxon_namespace=taxa, **seqs_args)
+		alignment_length = dna.sequence_size
+		sequence_count = len(dna)
+		if sequence_count != len(dna.taxon_namespace):
+			sys.stderr.write('taxon names in trees and alignment are different')
+			exit(2)
+
+		print('Number of sequences: {} length {} '.format(sequence_count, alignment_length))
+		print('Model: ' + arg.model)
+
+		tipdata, weights = utils.get_dna_leaves_partials_compressed(dna)
+		alignment_length = len(weights)
+
+		data.update({'tipdata': tipdata, 'L': alignment_length, 'weights': weights})
+
+	if arg.metadata:
+		# Parse metadata file
+		with open(arg.metadata) as fp:
+			geodata = {}
+			countries = {}
+			geopattern = []
+			header = next(fp).strip().split('\t')
+			index_country = header.index('Country')
+
+			for line in fp:
+				row = line.strip().split('\t')
+				if len(row) > 0:
+					geodata[row[0]] = row[index_country]
+					countries[row[index_country]] = 1
+
+		country_to_index = {}
+		index_to_country = []
+		for idx, taxon in enumerate(tree.taxon_namespace):
+			country = geodata[taxon.label]
+			if country not in country_to_index:
+				country_to_index[country] = len(country_to_index)
+				index_to_country.append(country)
+
+		print('"' + '","'.join(index_to_country) + '"')
+
+		state_count = len(country_to_index)
+
+		for idx, taxon in enumerate(tree.taxon_namespace):
+			pattern = [0]*state_count
+			country = geodata[taxon.label]
+			pattern[country_to_index[country]] = 1
+			geopattern.append(pattern)
+
+		blens = [None]*(sequence_count*2-1)
+		for node in tree.postorder_node_iter():
+			blens[node.index-1] = node.edge.length
+			if node.edge.length < 0:
+				exit(3)
+
+		children = tree.seed_node.child_nodes()
+		blens[children[0].index] += blens[children[1].index]
+		blens = blens[:-2] # discard root branch and one of its child
+
+		data['STATES'] = state_count
+		data['blens'] = blens
+		data['frequencies_alpha_geo'] = [1]*state_count
+		data['rates_alpha_geo'] = [1]*int(state_count*(state_count-1)/2)
+		data['geodata]'] = geopattern
 
 	if arg.clock is not None:
 		data['map'] = utils.get_preorder(tree)

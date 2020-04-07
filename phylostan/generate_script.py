@@ -789,6 +789,66 @@ def GTR(C=1, invariant=False):
 		return gtr_function_str.format('', '', '', '', '', '')
 
 
+def P_matrix_function():
+	function_str = '''
+	matrix[] calculate_p_matrices(int states, vector freqs, vector rates, vector blens){
+		int bcount = rows(blens);
+		matrix[states,states] pmats[bcount]; // probability matrices
+		int index;
+		real s = 0.0; // scaler for rate matrix
+
+		matrix[states,states] Q; // rate matrix
+		matrix[states,states] P2 = diag_matrix(sqrt(freqs));        // diagonal sqrt frequencies
+		matrix[states,states] P2inv = diag_matrix(1.0 ./ sqrt(freqs)); // diagonal inverse sqrt frequencies
+		matrix[states,states] A; // another symmetric matrix
+		vector[states] eigenvalues;
+		matrix[states,states] eigenvectors;
+		matrix[states,states] m1;
+		matrix[states,states] m2;
+		matrix[states,states] R = rep_matrix(0.0, states, states);
+		// symmetric rate matrix
+		index = 1;
+		for (col in 1:(states-1)) {
+			for (row in (col+1):states) {
+				R[row,col] = rates[index];
+				R[col,row] = R[row,col];
+				index = index+1;
+			}
+		}
+
+		Q = R * diag_matrix(freqs);
+		for (i in 1:states) {
+			Q[i,i] = 0.0;
+			Q[i,i] = -sum(Q[i,1:states]);
+			s -= Q[i,i] * freqs[i];
+		}
+		Q /= s;
+
+		A = P2 * Q * P2inv;
+
+		eigenvalues = eigenvalues_sym(A);
+		eigenvectors = eigenvectors_sym(A);
+
+		m1 = P2inv * eigenvectors;
+		m2 = eigenvectors' * P2;
+
+		for( b in 1:bcount ){
+			if(blens[b] != 0.0){
+				pmats[b] = m1 * diag_matrix(exp(eigenvalues*blens[b])) * m2;
+			}
+			// exp(Q*0) should be the identity matrix
+			// m1 * diag_matrix(exp(eigenvalues*0)) * m2 gives tiny negative values
+			else{
+				pmats[b] = diag_matrix(rep_vector(1.0, states));
+			}
+		}
+
+		return pmats;
+	}
+	'''
+	return function_str
+
+
 one_on_X = """
 	real oneOnX_log(real x){
 		return -log(x);
@@ -892,7 +952,120 @@ def likelihood(mixture, clock=True):
 	return model
 
 
+def get_geo_likelihood(rescaling=False, unknown_root_frequencies=True):
+	model_str = """\n
+	// copy tip data into node probability vector
+	for( n in 1:S ) {
+		partials_geo[n] = geodata[n];
+	}
+"""
+	if rescaling:
+		model_str += """ 	
+	// calculate geo likelihood
+	for( n in 1:(S-2) ) {
+		partials_geo[peel[n,3]] = (pmats_geo[peel[n,1]]*partials_geo[peel[n,1]]) .* (pmats_geo[peel[n,2]]*partials_geo[peel[n,2]]);
+		max_partials_geo = max(partials_geo[peel[n,3]]);
+		if(max_partials_geo < 1.0e-40){
+			partials_geo[peel[n,3]] /= max_partials_geo;
+			scaling_factors_geo[n] = log(max_partials_geo);
+		}
+	}
+	partials_geo[peel[S-1,3]] = (pmats_geo[peel[S-1,1]]*partials_geo[peel[S-1,1]]) .* partials_geo[peel[S-1,2]];
+	max_partials_geo = max(partials_geo[peel[S-1,3]]);
+	if(max_partials_geo < 1.0e-40){
+		partials_geo[peel[S-1,3]] /= max_partials_geo;
+		scaling_factors_geo[S-1] = log(max_partials_geo);
+	}
+	// add the site log likelihood
+	target += sum(scaling_factors_geo);
+"""
+	else:
+		model_str += """ 	
+		// calculate geo likelihood
+		for( n in 1:(S-2) ) {
+			partials_geo[peel[n,3]] = (pmats_geo[peel[n,1]]*partials_geo[peel[n,1]]) .* (pmats_geo[peel[n,2]]*partials_geo[peel[n,2]]);
+		}
+		partials_geo[peel[S-1,3]] = (pmats_geo[peel[S-1,1]]*partials_geo[peel[S-1,1]]) .* partials_geo[peel[S-1,2]];
+
+		// add the site log likelihood
+"""
+	if unknown_root_frequencies:
+		model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]]));\n'
+	else:
+		model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]] .* freqs_geo));\n'
+	return model_str
+
+
+def get_geo_model(params):
+	data_block = []
+	transformed_data_declarations = []
+	parameters_block = []
+	transformed_parameters_declarations = []
+	model_block_declarations = []
+	model_priors = []
+	model_block = []
+	functions_block = []
+
+	data_block.append('int <lower=0> S;                      // number of tips')
+	data_block.append('int <lower=0> STATES;                      // number of states')
+	data_block.append('vector<lower=0,upper=1>[STATES] geodata[S]; // alignment as partials')
+	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
+	data_block.append('vector<lower=0> [2*S-3] blens; // branch lengths')
+
+	data_block.append('vector<lower=0>[STATES] frequencies_alpha_geo; // parameters of the prior on frequencies')
+	data_block.append('vector<lower=0>[choose(STATES,2)] rates_alpha_geo;       // parameters of the prior on rates')
+
+	transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
+	transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
+	transformed_data_declarations.append('int rateCount_geo = choose(STATES,2); // number of geo rates')
+
+	model_block_declarations.append('vector[STATES] partials_geo[2*S-1];   // partial probabilities for the S tips and S-1 internal nodes')
+	model_block_declarations.append('matrix[STATES,STATES] pmats_geo[bcount]; // finite-time transition matrices for each branch')
+	if params.rescaling_geo:
+		model_block_declarations.append('vector[S-1] scaling_factors_geo = rep_vector(0.0, S-1);')
+		model_block_declarations.append('real max_partials_geo;')
+
+	parameters_block.append('vector<lower=0.1>[rateCount_geo] rates_geo;')
+	parameters_block.append('simplex[STATES] freqs_geo;')
+
+	model_priors.append('freqs_geo ~ dirichlet(frequencies_alpha_geo);')
+
+	functions_block.append(P_matrix_function())
+
+	model_block.append('pmats_geo = calculate_p_matrices(STATES, freqs_geo, rates_geo, blens);')
+
+	model_block.append(get_geo_likelihood(params.rescaling_geo))
+
+	script = ''
+
+	if len(functions_block) > 0:
+		script += 'functions{' + '\n'.join(functions_block) + '\n}\n\n'
+
+	script += 'data{\n' + '\t' + '\n\t'.join(data_block) + '\n}\n\n'
+
+	if len(transformed_data_declarations) != 0:
+		script += 'transformed data{\n'
+		script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
+		script += '}\n\n'
+
+	script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
+
+	if len(transformed_parameters_declarations) != 0:
+		script += 'transformed parameters{\n'
+		script += '\t' + '\n\t'.join(transformed_parameters_declarations) + '\n\n'
+
+	script += 'model{\n'
+	script += '\t' + '\n\t'.join(model_block_declarations) + '\n\n'
+	script += '\t' + '\n\t'.join(model_priors) + '\n\n'
+	script += '\t' + '\n\t'.join(model_block) + '\n}\n\n'
+
+	return script
+
+
 def get_model(params):
+	if params.geo:
+		return get_geo_model(params)
+
 	functions_block = []
 
 	data_block = []
