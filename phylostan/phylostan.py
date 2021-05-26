@@ -62,7 +62,7 @@ def create_run_parser(subprasers):
 						help="""Maximum number of iterations for variational inference or number of iterations for NUTS 
 						and HMC algorithms""")
 	parser.add_argument('-M', '--metadata', help="""Phylogeography metadata file""")
-	parser.add_argument('--metadata_key', help="""Phylogeography: use key in metadadeta""")
+	parser.add_argument('--metadata_key', default="Country", help="""Phylogeography: use key in metadata""")
 	return parser
 
 
@@ -89,9 +89,11 @@ def create_build_parser(subprasers, prog, help):
 						help="""Speciation model (birth-death or Yule)""")
 	parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 	parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
+	parser.add_argument('--time_aware', action="store_true", help="""Use time-aware GMRF (skyride only)""")
 	parser.add_argument('--compile', action="store_true", help="""Compile Stan script""")
+	parser.add_argument('--rescaling', action="store_true", help="""Use rescaling in DNA tree likelihood calculation""")
 	parser.add_argument('--geo', action="store_true", help="""Phylogeography""")
-	parser.add_argument('--rescaling_geo', action="store_true", help="""Use rescaling phylogeography""")
+	parser.add_argument('--rescaling_geo', action="store_true", help="""Use rescaling ph ylogeography""")
 	return parser
 
 
@@ -210,7 +212,7 @@ def run(arg):
 			countries = {}
 			geopattern = []
 			header = next(fp).strip().split('\t')
-			index_country = header.index('Country')
+			index_country = header.index(arg.metadata_key)
 
 			for line in fp:
 				row = line.strip().split('\t')
@@ -250,7 +252,7 @@ def run(arg):
 		data['blens'] = blens
 		data['frequencies_alpha_geo'] = [1]*state_count
 		data['rates_alpha_geo'] = [1]*int(state_count*(state_count-1)/2)
-		data['geodata]'] = geopattern
+		data['geodata'] = geopattern
 
 	if arg.clock is not None:
 		data['map'] = utils.get_preorder(tree)
@@ -305,7 +307,7 @@ def run(arg):
 		if arg.eta:
 			stan_args['eta'] = arg.eta
 			stan_args['adapt_engaged'] = False
-		if arg.seed:
+		if hasattr(arg, 'seed'):
 			stan_args['seed'] = arg.seed
 
 		fit = sm.vb(data=data, tol_rel_obj=arg.tol_rel_obj, elbo_samples=arg.elbo_samples, grad_samples=arg.grad_samples,

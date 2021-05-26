@@ -246,6 +246,19 @@ def aoup_prior(heterochronous):
 		return str.format('', '')
 
 
+def ctmc_scale_prior():
+	# Code adapted from https://github.com/beast-dev/beast-mcmc/blob/master/src/dr/evomodel/tree/CTMCScalePrior.java
+	ctmc_scale = """
+	real ctmc_scale_log(real rate, vector blens){
+		real total_tree_time = sum(blens);
+		real log_normalization = 0.5 * log(total_tree_time) - 0.5723649263381958; //lgamma(0.5);
+		real log_like = log_normalization - 0.5 * log(rate) - rate * total_tree_time;
+		return log_like;
+	}
+"""
+	return ctmc_scale
+
+
 def get_weibull(invariant=False):
 	weibull_pinv_site_rates = """
 		{
@@ -282,78 +295,71 @@ def get_weibull(invariant=False):
 		return weibull_site_rates
 
 
-def constant_coalescent(heterochronous=False):
+def constant_coalescent():
 	constant_coalescent_str = """
-	real constant_coalescent_log(real[] heights, real popSize, int[,] map{0}){{
-		int S = size(heights)+1; // number of leaves from the number of internal nodes
-		int nodeCount = size(heights) + S;
+	real constant_coalescent_log(real[] heights, real popSize, int[,] map){
+		int nodeCount = size(heights);
+		int S = (nodeCount+1)/2;
 
 		real logP = 0.0;
 		real lineageCount = 0.0; // first 2 intervals are sampling events
 
 		int indices[nodeCount];
 		int childCounts[nodeCount];
-		real times[nodeCount];
 
 		real start;
 		real finish;
 		real interval;
 		real logPopSize = log(popSize);
 
-		for( i in 1:nodeCount ){{
+		for( i in 1:nodeCount ){
 			// internal node: transform
-			if(map[i,1] > S){{
-				times[map[i,1]] = heights[map[i,1]-S];
+			if(map[i,1] > S){
 				childCounts[map[i,1]] = 2;
-			}}
-			else{{
-				times[map[i,1]] = {1};
+			}
+			else{
 				childCounts[map[i,1]] = 0;
-			}}
-		}}
+			}
+		}
 
 		// calculate intervals
-		indices = sort_indices_asc(times);
+		indices = sort_indices_asc(heights);
 
 		// first tip
-		start = times[indices[1]];
+		start = heights[indices[1]];
 
-		for (i in 1:nodeCount) {{
-			finish = times[indices[i]];
+		for (i in 1:nodeCount) {
+			finish = heights[indices[i]];
 			
 			interval = finish - start;
-			if(interval != 0.0){{
+			if(interval != 0.0){
 				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
-			}}
+			}
 			
 			// sampling event
-			if (childCounts[indices[i]] == 0) {{
+			if (childCounts[indices[i]] == 0) {
 				lineageCount += 1.0;
-			}}
+			}
 			// coalescent event
-			else {{
+			else {
 				lineageCount -= 1.0;
 				logP -= logPopSize;
-			}}
+			}
 			
 			start = finish;
-		}}
+		}
 
 		return logP;
-	}}
+	}
 	"""
-
-	if heterochronous:
-		return constant_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
-	else:
-		return constant_coalescent_str.format('', '0')
+	return constant_coalescent_str
 
 
-def skyride_coalescent(heterochronous):
+def skyride_coalescent():
 	skyride_coalescent_str = """
-	real skyride_coalescent_log(real[] heights, vector pop, int[,] map{0}){{
-		int S = size(heights)+1; // number of leaves from the number of internal nodes
-		int nodeCount = size(heights) + S;
+	real skyride_coalescent_log(real[] heights, vector pop, int[,] map){
+		int nodeCount = size(heights);
+		int S = (nodeCount+1)/2;
 
 		real logP = 0.0;
 		int index = 1;
@@ -366,17 +372,15 @@ def skyride_coalescent(heterochronous):
 		real finish;
 		real interval;
 
-		for( i in 1:nodeCount ){{
-			// internal node: transform
-			if(map[i,1] > S){{
-				times[i] = heights[map[i,1]-S];
+		for( i in 1:nodeCount ){
+			if(map[i,1] > S){
 				childCounts[i] = 2;
-			}}
-			else{{
-				times[i] = {1};
+			}
+			else{
 				childCounts[i] = 0;
-			}}
-		}}
+			}
+			times[i] = heights[map[i,1]];
+		}
 
 		// calculate intervals
 		indices = sort_indices_asc(times);
@@ -384,47 +388,43 @@ def skyride_coalescent(heterochronous):
 		// first tip
 		start = times[indices[1]];
 
-		for (i in 1:nodeCount) {{
+		for (i in 1:nodeCount) {
 			finish = times[indices[i]];
 
 			interval = finish - start;
 			// consecutive sampling events
-			if(interval != 0.0){{
+			if(interval != 0.0){
 				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/exp(pop[index]);
-				if (childCounts[indices[i]] != 0) {{
+				if (childCounts[indices[i]] != 0) {
 					logP -= pop[index];
 					index += 1;
-				}}
-			}}
+				}
+			}
 
 			// sampling event
-			if (childCounts[indices[i]] == 0) {{
+			if (childCounts[indices[i]] == 0) {
 				lineageCount += 1.0;
-			}}
+			}
 			// coalescent event
-			else {{
+			else {
 				lineageCount -= 1.0;
-			}}
+			}
 
 			start = finish;
-		}}
+		}
 
 		return logP;
-	}}
+	}
 """
-
-	if heterochronous:
-		return skyride_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
-	else:
-		return skyride_coalescent_str.format('', '0')
+	return skyride_coalescent_str
 
 
-def skygrid_coalescent(heterochronous):
+def skygrid_coalescent():
 	skygrid_coalescent_str = """
-	real skygrid_coalescent_log(real[] heights, vector pop, int[,] map, vector grid{0}){{
+	real skygrid_coalescent_log(real[] heights, vector pop, int[,] map, vector grid){
 		int G = rows(grid);
-		int S = size(heights)+1; // number of leaves from the number of internal nodes
-		int nodeCount = size(heights) + S;
+		int nodeCount = size(heights);
+		int S = (nodeCount+1)/2;
 
 		real logP = 0.0;
 		int index = 1;
@@ -432,7 +432,6 @@ def skygrid_coalescent(heterochronous):
 
 		int indices[nodeCount];
 		int childCounts[nodeCount];
-		real times[nodeCount];
 		real start;
 		real finish;
 		real end;
@@ -440,64 +439,58 @@ def skygrid_coalescent(heterochronous):
 		real popSize;
 		real logPopSize;
 
-		for( i in 1:nodeCount ){{
+		for( i in 1:nodeCount ){
 			// internal node: transform
-			if(map[i,1] > S){{
-				times[map[i,1]] = heights[map[i,1]-S];
+			if(map[i,1] > S){
 				childCounts[map[i,1]] = 2;
-			}}
-			else{{
-				times[map[i,1]] = {1};
+			}
+			else{
 				childCounts[map[i,1]] = 0;
-			}}
-		}}
+			}
+		}
 
 		// calculate intervals
-		indices = sort_indices_asc(times);
+		indices = sort_indices_asc(heights);
 
 		// first tip
-		start = times[indices[1]];
+		start = heights[indices[1]];
 		logPopSize = pop[index];
 		popSize = exp(logPopSize);
 
-		for (i in 1:nodeCount) {{
-			finish = times[indices[i]];
+		for (i in 1:nodeCount) {
+			finish = heights[indices[i]];
 
-			while(index < G && finish > grid[index]){{
+			while(index < G && finish > grid[index]){
 				end = fmin(grid[index], finish);
 				logP -= (end - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
 				start = end;
 
-				if(index < G){{
+				if(index < G){
 					index += 1;
 					logPopSize = pop[index];
 					popSize = exp(logPopSize);
-				}}
-			}}
+				}
+			}
 			logP -= (finish - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
-			if (childCounts[indices[i]] != 0) {{
+			if (childCounts[indices[i]] != 0) {
 				logP -= logPopSize;
-			}}
+			}
 
 			// sampling event
-			if (childCounts[indices[i]] == 0) {{
+			if (childCounts[indices[i]] == 0) {
 				lineageCount += 1.0;
-			}}
+			}
 			// coalescent event
-			else {{
+			else {
 				lineageCount -= 1.0;
-			}}
+			}
 
 			start = finish;
-		}}
+		}
 		return logP;
-	}}
+	}
 """
-
-	if heterochronous:
-		return skygrid_coalescent_str.format(', real[] lowers', 'lowers[map[i,1]]')
-	else:
-		return skygrid_coalescent_str.format('', '0')
+	return skygrid_coalescent_str
 
 
 def GMRF():
@@ -516,92 +509,91 @@ def GMRF():
 	return gmrf_logP
 
 
-def GMRF_time_aware(heterochronous):
+def GMRF_time_aware():
 	gmrf_logP = """
 	// Time aware (mid-point)
-	real gmrf_log(vector logPopSize, real precision, real[] heights, int[,] mapDEF){
-		int S = size(heights)+1; // number of leaves from the number of internal nodes
-		int nodeCount = size(heights) + S;
+	real gmrf_log(vector logPopSize, real precision, real[] heights, int[,] map){
+		int nodeCount = size(heights);
+		int S = (nodeCount+1)/2;
 		int N = S - 1;
 		real realN = N;
 		real s = 0;
-
-		int indices[nodeCount];
+		int index = 1;
+		int childCounts[nodeCount];
 		real times[nodeCount];
+		int indices[nodeCount];
+		real start;
+		real finish;
+		vector[S-1] intervals = rep_vector(0.0, S-1); // inter-coalescent intervals
 
 		for( i in 1:nodeCount ){
 			// internal node: transform
 			if(map[i,1] > S){
-				times[i] = heights[map[i,1]-S];
+				childCounts[i] = 2; 
 			}
 			else{
-				times[i] = TIP;
+				childCounts[i] = 0;
 			}
+			times[i] = heights[map[i, 1]];
 		}
+		
+		indices =  sort_indices_asc(times);
 
-		// calculate intervals
-		indices = sort_indices_asc(times);
+		// first tip
+		start = times[indices[1]];
 
+		for (i in 2:nodeCount) {
+			finish = times[indices[i]];
+			intervals[index] += finish - start;
+			if (childCounts[indices[i]] != 0) {
+				index += 1;
+			}
+			start = finish;
+		}
 		for (i in 2:N){
-			s += pow(logPopSize[i]-logPopSize[i-1], 2.0)*2.0/(times[indices[S+i]] - times[indices[S+i-2]]);
+			s += pow(logPopSize[i]-logPopSize[i-1], 2.0)*2.0/(intervals[i] + intervals[i-1]);
 		}
 		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
 	}
 """
-	if heterochronous:
-		return gmrf_logP.replace('DEF', ', real[] lowers').replace('TIP', 'lowers[map[i,1]]')
-	else:
-		return gmrf_logP.replace('DEF', '').replace('TIP', '0')
+	return gmrf_logP
 
 
-def heights_to_blens(heterochronous=False, strict=True):
-	model_heights_to_blens = """
-	// populate blens from heights array in preorder
-	for( j in 2:nodeCount ){{
-		// internal node
-		if(map[j,1] > S){{
-			blens[map[j,1]] = rate*(heights[map[j,2]-S] - heights[map[j,1]-S]);
-		}}
-		else{{
-			blens[map[j,1]] = rate*(heights[map[j,2]-S]{});
-		}}
-	}}
+def heights_to_branch_lengths():
+	heights_to_blens = """
+	// convert from heights to branch lengths
+	vector heights_to_branch_lengths(real[] heights, int[,] map){
+		int bcount = size(heights) - 1;
+		vector [bcount] blens;
+		for( j in 2:(bcount+1) ){
+			blens[map[j,1]] = heights[map[j,2]] - heights[map[j,1]];
+		}
+		return blens;
+	}
 """
-	if heterochronous:
-		model_heights_to_blens = model_heights_to_blens.format(' - lowers[map[j,1]]')
+	return heights_to_blens
+
+
+def branch_lengths_rate_product(strict):
+	if strict:
+		model_heights_to_blens = 'blens = rate*blens_unscaled;'
 	else:
-		model_heights_to_blens = model_heights_to_blens.format('')
-	if not strict:
-		return model_heights_to_blens.replace('rate', 'substrates[map[j,1]]')
+		model_heights_to_blens = 'blens = substrates*blens_unscaled;'
 	return model_heights_to_blens
 
 
-def heights_to_blens_autocorr(heterochronous=False):
+def branch_lengths_rates_product_autocorr():
 	model_heights_to_blens = """
-	// populate blens from heights array in preorder
-	for( j in 2:nodeCount ){{
-		if(map[j,1] > S){{
-			blens[map[j,1]] = heights[map[j,2]-S] - heights[map[j,1]-S];
-		}}
+	blens[map[2,1]] = blens_unscaled[map[2,1]]*substrates[map[2,1]];
+	for( j in 3:nodeCount ){
+		if(map[j,2] == nodeCount){
+			blens[map[j,1]] = blens_unscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[2,1]]);
+		}
 		else{{
-			blens[map[j,1]] = heights[map[j,2]-S]{};
-		}}
-	}}
-	
-	blens[map[2,1]] *= substrates[map[2,1]];
-	for( j in 3:nodeCount ){{
-		if(map[j,2] == nodeCount){{
-			blens[map[j,1]] *= 0.5*(substrates[map[j,1]] + substrates[map[2,1]]);
-		}}
-		else{{
-			blens[map[j,1]] *= 0.5*(substrates[map[j,1]] + substrates[map[j,2]]);
-		}}
-	}}
+			blens[map[j,1]] = blens_unscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[j,2]]);
+		}
+	}
 """
-	if heterochronous:
-		model_heights_to_blens = model_heights_to_blens.format(' - lowers[map[j,1]]')
-	else:
-		model_heights_to_blens = model_heights_to_blens.format('')
 	return model_heights_to_blens
 
 	
@@ -612,15 +604,18 @@ def transform_heights(heterochronous=False):
 		int S = size(p)+2;
 		int nodeCount = S*2-1;
 		
-		real heights[S-1];
+		real heights[nodeCount];
 		int j = 1;
 		
-		heights[map[1,1]-S] = rootHeight;
+		heights[map[1,1]] = rootHeight;
 		for( i in 2:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
-				heights[map[i,1]-S] = {1}(heights[map[i,2]-S]{2})*p[j];
+				heights[map[i,1]] = {1}(heights[map[i,2]]{2})*p[j];
 				j += 1;
+			}}
+			else{{
+				heights[map[i,1]] = {3};
 			}}
 		}}
 		return heights;
@@ -628,9 +623,9 @@ def transform_heights(heterochronous=False):
 	"""
 
 	if heterochronous:
-		return transform_str.format(', real[] lowers', 'lowers[map[i,1]] + ', ' - lowers[map[i,1]]')
+		return transform_str.format(', real[] lowers', 'lowers[map[i,1]] + ', ' - lowers[map[i,1]]', 'lowers[map[i,1]]')
 	else:
-		return transform_str.format('', '', '')
+		return transform_str.format('', '', '', '0.0')
 
 
 def jacobian(heterochronous=False):
@@ -639,7 +634,7 @@ def jacobian(heterochronous=False):
 	for( i in 2:nodeCount ){{
 		// skip leaves
 		if(map[i,1] > S ){{
-			target += log(heights[map[i,2]-S]{});
+			target += log(heights[map[i,2]]{});
 		}}
 	}}
 """
@@ -884,10 +879,7 @@ def likelihood(mixture, clock=True):
 		for( n in 1:(S-1) ) {
 			partials[peel[n,3],i] = (pmats[peel[n,1]]*partials[peel[n,1],i]) .* (pmats[peel[n,2]]*partials[peel[n,2],i]);
 		}
-
-		for(j in 1:4){
-			partials[2*S,i][j] = partials[peel[S-1,3],i][j] * freqs[j];
-		}
+		partials[2*S,i] = partials[peel[S-1,3],i] .* freqs;
 		// add the site log likelihood
 		target += log(sum(partials[2*S,i]))*weights[i];
 	}
@@ -1017,7 +1009,6 @@ def get_geo_model(params):
 
 	transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
 	transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
-	transformed_data_declarations.append('int rateCount_geo = choose(STATES,2); // number of geo rates')
 
 	model_block_declarations.append('vector[STATES] partials_geo[2*S-1];   // partial probabilities for the S tips and S-1 internal nodes')
 	model_block_declarations.append('matrix[STATES,STATES] pmats_geo[bcount]; // finite-time transition matrices for each branch')
@@ -1025,10 +1016,11 @@ def get_geo_model(params):
 		model_block_declarations.append('vector[S-1] scaling_factors_geo = rep_vector(0.0, S-1);')
 		model_block_declarations.append('real max_partials_geo;')
 
-	parameters_block.append('vector<lower=0.1>[rateCount_geo] rates_geo;')
+	parameters_block.append('vector<lower=0>[rateCount_geo] rates_geo;')
 	parameters_block.append('simplex[STATES] freqs_geo;')
 
 	model_priors.append('freqs_geo ~ dirichlet(frequencies_alpha_geo);')
+	model_priors.append('rates_geo ~ gamma(1,1);')
 
 	functions_block.append(P_matrix_function())
 
@@ -1149,12 +1141,17 @@ def get_model(params):
 		transformed_data_declarations.append('int pCount = S-2; // number of proportions')
 
 		parameters_block.append('real <lower=0,upper=1> props[pCount]; // proportions')
-		transformed_parameters_declarations.append('real <lower=0> heights[S-1];')
+		transformed_parameters_declarations.append('real <lower=0> heights[2*S-1];')
+
+		transformed_parameters_declarations.append(
+			'vector<lower=0> [bcount] blens_unscaled; // unscaled branch lengths')
+		functions_block.append(heights_to_branch_lengths())
 
 		if params.estimate_rate:
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
-				model_priors.append('rate ~ exponential(1000);')
+				functions_block.append(ctmc_scale_prior())
+				model_priors.append('rate ~ ctmc_scale(blens_unscaled);')
 			elif params.clock.endswith('mrf'):
 				transformed_parameters_declarations.append('real substrates[bcount];')
 				parameters_block.append('real deltas[2*S-3];')
@@ -1227,42 +1224,40 @@ def get_model(params):
 			parameters_block.append('real<lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map);')
 
+		transformed_parameters_block.append('blens_unscaled = heights_to_branch_lengths(heights, map);')
+
 		if params.clock in ('acln', 'acg', 'ace', 'aoup', 'hsmrf', 'gmrf'):
-			model_block.append(heights_to_blens_autocorr(params.heterochronous))
+			model_block.append(branch_lengths_rates_product_autocorr())
 		else:
-			model_block.append(heights_to_blens(params.heterochronous, params.clock == 'strict' or not params.estimate_rate))
+			model_block.append(branch_lengths_rate_product(params.clock == 'strict' or not params.estimate_rate))
 
 		# Coalescent
 		if params.coalescent == 'constant':
 			functions_block.append(one_on_X)
 			parameters_block.append('real <lower=0> theta;')
 			model_priors.append('theta ~ oneOnX();')
-			functions_block.append(constant_coalescent(params.heterochronous))
-			if params.heterochronous:
-				model_priors.append('heights ~ constant_coalescent(theta, map, lowers);')
-			else:
-				model_priors.append('heights ~ constant_coalescent(theta, map);')
+			functions_block.append(constant_coalescent())
+			model_priors.append('heights ~ constant_coalescent(theta, map);')
 		elif params.coalescent == 'skyride':
-			functions_block.append(skyride_coalescent(params.heterochronous))
-			functions_block.append(GMRF())
-			# functions_block.append(GMRF_time_aware(params.heterochronous))
+			functions_block.append(skyride_coalescent())
+			if params.time_aware:
+				functions_block.append(GMRF_time_aware())
+			else:
+				functions_block.append(GMRF())
 
 			data_block.append('int I; // number of intervals')
 
 			parameters_block.append('vector[I] thetas; // log space')
 			parameters_block.append('real<lower=0> tau;')
 
-			if params.heterochronous:
-				model_priors.append('heights ~ skyride_coalescent(thetas, map, lowers);')
-				# model_priors.append('thetas ~ gmrf(tau, heights, map, lowers);')
+			model_priors.append('heights ~ skyride_coalescent(thetas, map);')
+			if params.time_aware:
+				model_priors.append('thetas ~ gmrf(tau, heights, map);')
 			else:
-				model_priors.append('heights ~ skyride_coalescent(thetas, map);')
-				# model_priors.append('thetas ~ gmrf(tau, heights, map);')
-
-			model_priors.append('thetas ~ gmrf(tau);')
+				model_priors.append('thetas ~ gmrf(tau);')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 		elif params.coalescent == 'skygrid':
-			functions_block.append(skygrid_coalescent(params.heterochronous))
+			functions_block.append(skygrid_coalescent())
 			functions_block.append(GMRF())
 
 			data_block.append('int G; // number of grid interval')
@@ -1271,10 +1266,7 @@ def get_model(params):
 			parameters_block.append('vector[G] thetas; // log space')
 			parameters_block.append('real<lower=0> tau;')
 
-			if params.heterochronous:
-				model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid, lowers);')
-			else:
-				model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
+			model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
 			model_priors.append('thetas ~ gmrf(tau);')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
