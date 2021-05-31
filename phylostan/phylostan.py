@@ -97,11 +97,18 @@ def create_build_parser(subprasers, prog, help):
 	return parser
 
 
+def create_compile_parser(subprasers, prog, help):
+	parser = subprasers.add_parser(prog, help=help)
+	parser.add_argument('-s', '--script', required=True, type=argparse.FileType('r'), help="""Stan script file""")
+	return parser
+
+
 def main():
 	parser_epilog = """To get some information for each sub-command:\n
 	phylostan build --help
 	phylostan run --help
 	phylostan parse --help
+	phylostan compile --help
 """
 
 	parser = argparse.ArgumentParser(prog='phylostan', description='Phylogenetic inference using Stan',
@@ -116,6 +123,9 @@ def main():
 
 	parse_parser = create_parse_parser(subprasers)
 	parse_parser.set_defaults(func=parse)
+
+	compile_parser = create_compile_parser(subprasers, 'compile', 'compile a Stan script')
+	compile_parser.set_defaults(func=compile_script)
 
 	arg = parser.parse_args()
 	try:
@@ -154,13 +164,17 @@ def build(arg):
 		fp.write(script)
 
 	if arg.compile:
-		binary = arg.script.replace('.stan', '.pkl')
-		# arg.script does not end with .stan
-		if binary == arg.script:
-			binary = arg.script + '.pkl'
-		sm = pystan.StanModel(file=arg.script)
-		with open(binary, 'wb') as f:
-			pickle.dump(sm, f)
+		compile_script(arg.script.name)
+
+
+def compile_script(arg):
+	binary = arg.script.name.replace('.stan', '.pkl')
+	# arg.script does not end with .stan
+	if binary == arg.script.name:
+		binary = arg.script.name + '.pkl'
+	sm = pystan.StanModel(file=arg.script.name)
+	with open(binary, 'wb') as f:
+		pickle.dump(sm, f)
 
 
 def run(arg):

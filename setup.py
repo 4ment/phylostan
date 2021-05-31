@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="phylostan",
-    version="1.0.3",
+    version="1.0.4",
     author="Mathieu Fourment",
     author_email="mathieu.fourment@uts.edu.au",
     description="Phylogenetic inference with Stan",
@@ -24,7 +24,7 @@ setuptools.setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     install_requires=[
-          'pystan>=2.19',
+          'pystan>=2.19,<3',
           'DendroPy',
           'numpy>=1.7'
     ],

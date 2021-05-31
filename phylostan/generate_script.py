@@ -1,9 +1,9 @@
 
 def birth_death():
 	code_str = '''
-	real birth_death_log(real[] heights, int[,] map, real rho, real a, real r){
-		int S = size(heights) + 1;
-		int nodeCount = S + size(heights);
+	real birth_death_log(vector heights, int[,] map, real rho, real a, real r){
+		int S = rows(heights) + 1;
+		int nodeCount = S + rows(heights);
 		real logP = 0;
 		for(i in 1:nodeCount){
 			if(map[i,1] > S){
@@ -70,9 +70,9 @@ def autocorrelated_prior(heterochronous):
 	log(r_i) ~ N(mu_i, sigma_i^2)
 	"""
 	code_str = '''
-	real logn_autocorrelated_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
-		int S = size(heights) + 1;
-		int nodeCount = S + size(heights);
+	real logn_autocorrelated_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+		int S = rows(heights) + 1;
+		int nodeCount = S + rows(heights);
 		real logP = 0.0;
 		// no rate at root and rate of first child is exponentialy distributed
 		for(i in 3:nodeCount){{
@@ -111,9 +111,9 @@ def acln_prior(heterochronous):
 	r_i ~ LN(mu_i, sigma_i)
 	"""
 	code_str = '''
-	real acln_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
-		int S = size(heights) + 1;
-		int nodeCount = S + size(heights);
+	real acln_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+		int S = rows(heights) + 1;
+		int nodeCount = S + rows(heights);
 		real logP = 0.0;
 		// no rate at root and rate of first child has a different distribution
 		for(i in 3:nodeCount){{
@@ -154,9 +154,9 @@ def acg_prior(heterochronous):
 	r_i ~ Gamma(shape_i, rate_i)
 	"""
 	code_str = '''
-	real acg_log(real[] rates, real[] heights, int[,] map, real nu{0}){{
-		int S = size(heights) + 1;
-		int nodeCount = S + size(heights);
+	real acg_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+		int S = rows(heights) + 1;
+		int nodeCount = S + rows(heights);
 		real logP = 0.0;
 		// no rate at root and rate of first child is exponentialy distributed
 		for(i in 3:nodeCount){{
@@ -216,9 +216,9 @@ def aoup_prior(heterochronous):
 	nu is sigma^2
 	'''
 	str = '''
-	real aoup_log(real[] rates, real[] heights, int[,] map, real beta, real nu{0}){{
-		int S = size(heights) + 1;
-		int nodeCount = S + size(heights);
+	real aoup_log(real[] rates, vector heights, int[,] map, real beta, real nu{0}){{
+		int S = rows(heights) + 1;
+		int nodeCount = S + rows(heights);
 		real logP = 0.0;
 		real deltaT;
 		// no rate at root and rate of first child is exponentialy distributed
@@ -297,59 +297,17 @@ def get_weibull(invariant=False):
 
 def constant_coalescent():
 	constant_coalescent_str = """
-	real constant_coalescent_log(real[] heights, real popSize, int[,] map){
-		int nodeCount = size(heights);
+	real constant_coalescent_log(vector heights, real popSize, int[,] map){
+		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
+		int intervalCount = nodeCount - 1;
 
-		real logP = 0.0;
-		real lineageCount = 0.0; // first 2 intervals are sampling events
+		int indices[nodeCount] = sort_indices_asc(heights);
+		vector[nodeCount] events = append_row(rep_vector(1, S), rep_vector(-1, S-1));
+		vector[intervalCount] lineageCount = cumulative_sum(events[indices])[:intervalCount];
+		vector[intervalCount] intervals = heights[indices][2:] - heights[indices][:intervalCount];
 
-		int indices[nodeCount];
-		int childCounts[nodeCount];
-
-		real start;
-		real finish;
-		real interval;
-		real logPopSize = log(popSize);
-
-		for( i in 1:nodeCount ){
-			// internal node: transform
-			if(map[i,1] > S){
-				childCounts[map[i,1]] = 2;
-			}
-			else{
-				childCounts[map[i,1]] = 0;
-			}
-		}
-
-		// calculate intervals
-		indices = sort_indices_asc(heights);
-
-		// first tip
-		start = heights[indices[1]];
-
-		for (i in 1:nodeCount) {
-			finish = heights[indices[i]];
-			
-			interval = finish - start;
-			if(interval != 0.0){
-				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
-			}
-			
-			// sampling event
-			if (childCounts[indices[i]] == 0) {
-				lineageCount += 1.0;
-			}
-			// coalescent event
-			else {
-				lineageCount -= 1.0;
-				logP -= logPopSize;
-			}
-			
-			start = finish;
-		}
-
-		return logP;
+		return -sum(intervals .* ((lineageCount .* (lineageCount-1.0))/2.0)) / popSize - (S-1)*log(popSize);
 	}
 	"""
 	return constant_coalescent_str
@@ -357,63 +315,25 @@ def constant_coalescent():
 
 def skyride_coalescent():
 	skyride_coalescent_str = """
-	real skyride_coalescent_log(real[] heights, vector pop, int[,] map){
-		int nodeCount = size(heights);
+	real skyride_coalescent_log(vector heights, vector logPopSize, int[,] map){
+		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
+		int intervalCount = nodeCount - 1;
 
-		real logP = 0.0;
-		int index = 1;
-		real lineageCount = 0.0;
+		int indices[nodeCount] = sort_indices_asc(heights);
+		vector[nodeCount] events = append_row(rep_vector(1, S), rep_vector(-1, S-1));
+		vector[intervalCount] lineageCount = cumulative_sum(events[indices])[:intervalCount];
+		vector[S-1] popSize = exp(logPopSize);
+		vector[intervalCount] intervals = heights[indices][2:] - heights[indices][:intervalCount];
+		int popIndices[nodeCount] = append_array(rep_array(0, S), rep_array(1, S-1));
+		int popIndicesSorted[intervalCount] = rep_array(0, intervalCount);
 
-		int indices[nodeCount];
-		int childCounts[nodeCount];
-		real times[nodeCount];
-		real start;
-		real finish;
-		real interval;
-
-		for( i in 1:nodeCount ){
-			if(map[i,1] > S){
-				childCounts[i] = 2;
-			}
-			else{
-				childCounts[i] = 0;
-			}
-			times[i] = heights[map[i,1]];
+		popIndicesSorted[1] = 1;
+		for( i in 2:intervalCount ){
+			popIndicesSorted[i] = popIndicesSorted[i-1] + popIndices[indices[i]];
 		}
 
-		// calculate intervals
-		indices = sort_indices_asc(times);
-
-		// first tip
-		start = times[indices[1]];
-
-		for (i in 1:nodeCount) {
-			finish = times[indices[i]];
-
-			interval = finish - start;
-			// consecutive sampling events
-			if(interval != 0.0){
-				logP -= interval*((lineageCount*(lineageCount-1.0))/2.0)/exp(pop[index]);
-				if (childCounts[indices[i]] != 0) {
-					logP -= pop[index];
-					index += 1;
-				}
-			}
-
-			// sampling event
-			if (childCounts[indices[i]] == 0) {
-				lineageCount += 1.0;
-			}
-			// coalescent event
-			else {
-				lineageCount -= 1.0;
-			}
-
-			start = finish;
-		}
-
-		return logP;
+		return -sum(intervals .* ((lineageCount .* (lineageCount-1.0))/2.0) ./ popSize[popIndicesSorted]) - sum(logPopSize); 
 	}
 """
 	return skyride_coalescent_str
@@ -421,72 +341,36 @@ def skyride_coalescent():
 
 def skygrid_coalescent():
 	skygrid_coalescent_str = """
-	real skygrid_coalescent_log(real[] heights, vector pop, int[,] map, vector grid){
+	real skygrid_coalescent_log(vector heights, vector logPopSize, int[,] map, vector grid){
 		int G = rows(grid);
-		int nodeCount = size(heights);
+		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
+		int intervalCount = nodeCount - 1 + G;
 
 		real logP = 0.0;
 		int index = 1;
-		real lineageCount = 0.0;
 
-		int indices[nodeCount];
-		int childCounts[nodeCount];
-		real start;
-		real finish;
-		real end;
+		vector[nodeCount+G] events = rep_vector(0, nodeCount+G);
+		vector[nodeCount+G] times = append_row(heights, grid);
+		int indices[nodeCount+G] = sort_indices_asc(times);
+		vector[intervalCount] intervals = times[indices][2:] - times[indices][:intervalCount];
+		vector[G+1] popSize = exp(logPopSize);
+		vector[intervalCount] lineageCount;
+		int popIndices[nodeCount+G] = append_array(rep_array(0, nodeCount), rep_array(1, G));
+		int popIndicesSorted[intervalCount] = rep_array(0, intervalCount);
 
-		real popSize;
-		real logPopSize;
-
-		for( i in 1:nodeCount ){
-			// internal node: transform
-			if(map[i,1] > S){
-				childCounts[map[i,1]] = 2;
-			}
-			else{
-				childCounts[map[i,1]] = 0;
+		events[:nodeCount] = append_row(rep_vector(1, S), rep_vector(-1, S-1));
+		lineageCount = cumulative_sum(events[indices])[:intervalCount];
+		
+		popIndicesSorted[1] = 1;
+		for( i in 2:intervalCount ){
+			popIndicesSorted[i] = popIndicesSorted[i-1] + popIndices[indices[i]];
+			if (events[indices[i]] == -1) {
+				logP -= logPopSize[popIndicesSorted[i]];
 			}
 		}
-
-		// calculate intervals
-		indices = sort_indices_asc(heights);
-
-		// first tip
-		start = heights[indices[1]];
-		logPopSize = pop[index];
-		popSize = exp(logPopSize);
-
-		for (i in 1:nodeCount) {
-			finish = heights[indices[i]];
-
-			while(index < G && finish > grid[index]){
-				end = fmin(grid[index], finish);
-				logP -= (end - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
-				start = end;
-
-				if(index < G){
-					index += 1;
-					logPopSize = pop[index];
-					popSize = exp(logPopSize);
-				}
-			}
-			logP -= (finish - start)*((lineageCount*(lineageCount-1.0))/2.0)/popSize;
-			if (childCounts[indices[i]] != 0) {
-				logP -= logPopSize;
-			}
-
-			// sampling event
-			if (childCounts[indices[i]] == 0) {
-				lineageCount += 1.0;
-			}
-			// coalescent event
-			else {
-				lineageCount -= 1.0;
-			}
-
-			start = finish;
-		}
+		logP -= sum(intervals .* ((lineageCount .* (lineageCount-1.0))/2.0) ./ popSize[popIndicesSorted]);
+	
 		return logP;
 	}
 """
@@ -497,13 +381,9 @@ def GMRF():
 	gmrf_logP = """
 	// Not time aware
 	real gmrf_log(vector logPopSize, real precision){
-		int N = rows(logPopSize);
-		real realN = N;
-		real s = 0;
-		for (i in 2:N){
-			s += pow(logPopSize[i]-logPopSize[i-1], 2.0);
-		}
-		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
+		int N = rows(logPopSize) - 1;
+		vector[N] logPopSizeDiff = logPopSize[2:] - logPopSize[:N];
+		return log(precision)*N/2.0 - (logPopSizeDiff' * logPopSizeDiff)*precision/2.0 - N/2.0 * log(2.0*pi());
 	}
 """
 	return gmrf_logP
@@ -512,8 +392,8 @@ def GMRF():
 def GMRF_time_aware():
 	gmrf_logP = """
 	// Time aware (mid-point)
-	real gmrf_log(vector logPopSize, real precision, real[] heights, int[,] map){
-		int nodeCount = size(heights);
+	real gmrf_log(vector logPopSize, real precision, vector heights, int[,] map){
+		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
 		int N = S - 1;
 		real realN = N;
@@ -559,38 +439,23 @@ def GMRF_time_aware():
 	return gmrf_logP
 
 
-def heights_to_branch_lengths():
-	heights_to_blens = """
-	// convert from heights to branch lengths
-	vector heights_to_branch_lengths(real[] heights, int[,] map){
-		int bcount = size(heights) - 1;
-		vector [bcount] blens;
-		for( j in 2:(bcount+1) ){
-			blens[map[j,1]] = heights[map[j,2]] - heights[map[j,1]];
-		}
-		return blens;
-	}
-"""
-	return heights_to_blens
-
-
 def branch_lengths_rate_product(strict):
 	if strict:
-		model_heights_to_blens = 'blens = rate*blens_unscaled;'
+		model_heights_to_blens = 'blens = rate*blensUnscaled;'
 	else:
-		model_heights_to_blens = 'blens = substrates*blens_unscaled;'
+		model_heights_to_blens = 'blens = substrates*blensUnscaled;'
 	return model_heights_to_blens
 
 
 def branch_lengths_rates_product_autocorr():
 	model_heights_to_blens = """
-	blens[map[2,1]] = blens_unscaled[map[2,1]]*substrates[map[2,1]];
+	blens[map[2,1]] = blensUnscaled[map[2,1]]*substrates[map[2,1]];
 	for( j in 3:nodeCount ){
 		if(map[j,2] == nodeCount){
-			blens[map[j,1]] = blens_unscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[2,1]]);
+			blens[map[j,1]] = blensUnscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[2,1]]);
 		}
 		else{{
-			blens[map[j,1]] = blens_unscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[j,2]]);
+			blens[map[j,1]] = blensUnscaled[map[j,1]]*0.5*(substrates[map[j,1]] + substrates[map[j,2]]);
 		}
 	}
 """
@@ -600,11 +465,11 @@ def branch_lengths_rates_product_autocorr():
 def transform_heights(heterochronous=False):
 	transform_str = """
 	// transform node heights to proportion, except for the root
-	real[] transform(real[] p, real rootHeight, int[,] map{0}){{
+	vector transform(real[] p, real rootHeight, int[,] map{0}){{
 		int S = size(p)+2;
 		int nodeCount = S*2-1;
 		
-		real heights[nodeCount];
+		vector[nodeCount] heights;
 		int j = 1;
 		
 		heights[map[1,1]] = rootHeight;
@@ -855,20 +720,16 @@ def likelihood(mixture, clock=True):
 	// copy tip data into node probability vector
 	for( n in 1:S ) {
 		for( i in 1:L ) {
-			for( a in 1:4 ) {
-				partials[n,i][a] = tipdata[n,i,a];
-			}
+			partials[n,i] = tipdata[n,i];
 		}
 	}
 """
 	init_tip_partials_mixture="""
 	// copy tip data into node probability vector
-	for( n in 1:S ) {
-		for( i in 1:L ) {
-			for( a in 1:4 ) {
-				for(c in 1:C){
-					partials[c,n,i][a] = tipdata[n,i,a];
-				}
+	for(c in 1:C){
+		for( n in 1:S ) {
+			for( i in 1:L ) {
+				partials[c,n,i] = tipdata[n,i];
 			}
 		}
 	}
@@ -1074,7 +935,7 @@ def get_model(params):
 
 	data_block.append('int <lower=0> L;                      // alignment length')
 	data_block.append('int <lower=0> S;                      // number of tips')
-	data_block.append('real<lower=0,upper=1> tipdata[S,L,4]; // alignment as partials')
+	data_block.append('vector<lower=0,upper=1>[4] tipdata[S,L]; // alignment as partials')
 	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
 	data_block.append('real weights[L];')
 
@@ -1096,7 +957,7 @@ def get_model(params):
 		model_block_declarations.append('matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch')
 
 	if params.categories > 1 and params.heterogeneity == 'weibull':
-		transformed_parameters_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
+		transformed_data_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
 
 		parameters_block.append('real<lower=0.1> wshape;')
 		if params.invariant:
@@ -1141,17 +1002,16 @@ def get_model(params):
 		transformed_data_declarations.append('int pCount = S-2; // number of proportions')
 
 		parameters_block.append('real <lower=0,upper=1> props[pCount]; // proportions')
-		transformed_parameters_declarations.append('real <lower=0> heights[2*S-1];')
+		transformed_parameters_declarations.append('vector <lower=0> [2*S-1] heights;')
 
 		transformed_parameters_declarations.append(
-			'vector<lower=0> [bcount] blens_unscaled; // unscaled branch lengths')
-		functions_block.append(heights_to_branch_lengths())
+			'vector<lower=0> [bcount] blensUnscaled; // unscaled branch lengths')
 
 		if params.estimate_rate:
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
 				functions_block.append(ctmc_scale_prior())
-				model_priors.append('rate ~ ctmc_scale(blens_unscaled);')
+				model_priors.append('rate ~ ctmc_scale(blensUnscaled);')
 			elif params.clock.endswith('mrf'):
 				transformed_parameters_declarations.append('real substrates[bcount];')
 				parameters_block.append('real deltas[2*S-3];')
@@ -1224,7 +1084,7 @@ def get_model(params):
 			parameters_block.append('real<lower=lower_root> height; // root height')
 			transformed_parameters_block.append('heights = transform(props, height, map);')
 
-		transformed_parameters_block.append('blens_unscaled = heights_to_branch_lengths(heights, map);')
+		transformed_parameters_block.append('blensUnscaled[map[2:,1]] = heights[map[2:,2]] - heights[map[2:,1]];')
 
 		if params.clock in ('acln', 'acg', 'ace', 'aoup', 'hsmrf', 'gmrf'):
 			model_block.append(branch_lengths_rates_product_autocorr())
@@ -1243,7 +1103,7 @@ def get_model(params):
 			if params.time_aware:
 				functions_block.append(GMRF_time_aware())
 			else:
-				functions_block.append(GMRF())
+				transformed_parameters_declarations.append('vector[I-1] deltaThetas = thetas[2:] - thetas[:(I-1)];')
 
 			data_block.append('int I; // number of intervals')
 
@@ -1254,20 +1114,20 @@ def get_model(params):
 			if params.time_aware:
 				model_priors.append('thetas ~ gmrf(tau, heights, map);')
 			else:
-				model_priors.append('thetas ~ gmrf(tau);')
+				model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 		elif params.coalescent == 'skygrid':
 			functions_block.append(skygrid_coalescent())
-			functions_block.append(GMRF())
+			transformed_parameters_declarations.append('vector[G] deltaThetas = thetas[2:] - thetas[:G];')
 
 			data_block.append('int G; // number of grid interval')
 			data_block.append('vector<lower=0>[G] grid;')
 
-			parameters_block.append('vector[G] thetas; // log space')
+			parameters_block.append('vector[G+1] thetas; // log space')
 			parameters_block.append('real<lower=0> tau;')
 
 			model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
-			model_priors.append('thetas ~ gmrf(tau);')
+			model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
 		parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
