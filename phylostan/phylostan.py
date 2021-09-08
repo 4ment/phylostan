@@ -89,6 +89,8 @@ def create_build_parser(subprasers, prog, help):
 						help="""Speciation model (birth-death or Yule)""")
 	parser.add_argument('--grid', metavar='I', required=False, type=int, help="""Number of grid points in skygrid""")
 	parser.add_argument('--cutoff', metavar='G', required=False, type=float, help="""a cutoff for skygrid""")
+	parser.add_argument('--non_centered', action="store_true",
+						help="""Use non centered parameterization for population size parameters (skygrid only)""")
 	parser.add_argument('--time_aware', action="store_true", help="""Use time-aware GMRF (skyride only)""")
 	parser.add_argument('--compile', action="store_true", help="""Compile Stan script""")
 	parser.add_argument('--rescaling', action="store_true", help="""Use rescaling in DNA tree likelihood calculation""")
@@ -99,7 +101,7 @@ def create_build_parser(subprasers, prog, help):
 
 def create_compile_parser(subprasers, prog, help):
 	parser = subprasers.add_parser(prog, help=help)
-	parser.add_argument('-s', '--script', required=True, type=argparse.FileType('r'), help="""Stan script file""")
+	parser.add_argument('-s', '--script', required=True, help="""Stan script file""")
 	return parser
 
 
@@ -164,15 +166,19 @@ def build(arg):
 		fp.write(script)
 
 	if arg.compile:
-		compile_script(arg.script.name)
+		compile_script_func(arg.script)
 
 
 def compile_script(arg):
-	binary = arg.script.name.replace('.stan', '.pkl')
+	compile_script_func(arg.script)
+
+
+def compile_script_func(script_name):
+	binary = script_name.replace('.stan', '.pkl')
 	# arg.script does not end with .stan
-	if binary == arg.script.name:
-		binary = arg.script.name + '.pkl'
-	sm = pystan.StanModel(file=arg.script.name)
+	if binary == script_name:
+		binary = script_name + '.pkl'
+	sm = pystan.StanModel(file=script_name)
 	with open(binary, 'wb') as f:
 		pickle.dump(sm, f)
 

@@ -1118,16 +1118,25 @@ def get_model(params):
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 		elif params.coalescent == 'skygrid':
 			functions_block.append(skygrid_coalescent())
-			transformed_parameters_declarations.append('vector[G] deltaThetas = thetas[2:] - thetas[:G];')
 
 			data_block.append('int G; // number of grid interval')
 			data_block.append('vector<lower=0>[G] grid;')
 
-			parameters_block.append('vector[G+1] thetas; // log space')
 			parameters_block.append('real<lower=0> tau;')
 
+			if params.non_centered:
+				parameters_block.append('real theta1;')
+				parameters_block.append('vector[G] deltaThetas;')
+				transformed_parameters_declarations.append('real<lower=0> sigma = 1.0/sqrt(tau);')
+				transformed_parameters_declarations.append('vector[G+1] thetas;')
+				transformed_parameters_block.append('thetas = cumulative_sum(append_row(theta1, sigma * deltaThetas));')
+				model_priors.append('deltaThetas ~ normal(0.0, 1.0);')
+			else:
+				parameters_block.append('vector[G+1] thetas; // log space')
+				transformed_parameters_declarations.append('vector[G] deltaThetas = thetas[2:] - thetas[:G];')
+				model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
+
 			model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
-			model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
 			model_priors.append('tau ~ gamma(0.001, 0.001);')
 	else:
 		parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
