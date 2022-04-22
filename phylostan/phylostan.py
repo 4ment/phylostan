@@ -82,6 +82,10 @@ def create_build_parser(subprasers, prog, help):
 	parser.add_argument('--clock', required=False,
 						choices=['strict', 'ace', 'acln', 'acg', 'aoup', 'ucln', 'uced', 'gmrf', 'hsmrf'], default=None,
 						help="""Type of clock""")
+	parser.add_argument('--clockpr', default='ctmcscale',
+						type=lambda x: distribution_type(x, ('exponential', 'ctmcscale')),
+						help="""prior on substitution rate [default: %(default)s]""",
+	)
 	parser.add_argument('--estimate_rate', action='store_true', help="""Estimate substitution rate""")
 	parser.add_argument('-c', '--coalescent', choices=['constant', 'skyride', 'skygrid'], default=None,
 						help="""Type of coalescent (constant or skyride)""")
@@ -103,6 +107,22 @@ def create_compile_parser(subprasers, prog, help):
 	parser = subprasers.add_parser(prog, help=help)
 	parser.add_argument('-s', '--script', required=True, help="""Stan script file""")
 	return parser
+
+
+def distribution_type(arg, choices):
+    """Used by argparse for specifying distributions with optional
+    parameters."""
+    res = arg.split('(')
+    if (isinstance(choices, tuple) and res[0] in choices) or res[0] == choices:
+        return arg
+    else:
+        if isinstance(choices, tuple):
+            message = "'" + "','".join(choices) + '"'
+        else:
+            message = "'" + choices + "'"
+        raise argparse.ArgumentTypeError(
+            'invalid choice (choose from a number or ' + message + ')'
+        )
 
 
 def main():

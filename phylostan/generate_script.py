@@ -1010,8 +1010,11 @@ def get_model(params):
 		if params.estimate_rate:
 			if params.clock == 'strict':
 				parameters_block.append('real <lower=0> rate;')
-				functions_block.append(ctmc_scale_prior())
-				model_priors.append('rate ~ ctmc_scale(blensUnscaled);')
+				if params.clockpr == 'ctmcscale':
+					functions_block.append(ctmc_scale_prior())
+					model_priors.append('rate ~ ctmc_scale(blensUnscaled);')
+				else:
+					model_priors.append('rate ~ exponential(1000);')
 			elif params.clock.endswith('mrf'):
 				transformed_parameters_declarations.append('real substrates[bcount];')
 				parameters_block.append('real deltas[2*S-3];')
