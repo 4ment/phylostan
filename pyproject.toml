@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "test"
+]
+
+[tool.black]
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+
+[tool.pylint.messages_control]
+disable = [
+    "missing-module-docstring",
+    "no-else-return",
+    "too-many-ancestors",
+]
+generated-members = [
+    "numpy.*",
+    "dendropy.*"
+]

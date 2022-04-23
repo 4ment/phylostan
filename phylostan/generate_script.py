@@ -1,6 +1,5 @@
-
 def birth_death():
-	code_str = '''
+    code_str = '''
 	real birth_death_log(vector heights, int[,] map, real rho, real a, real r){
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
@@ -19,11 +18,11 @@ def birth_death():
 		return logP;
 	}
 	'''
-	return code_str
+    return code_str
 
 
 def get_delta_rates():
-	code_str = '''
+    code_str = '''
 	{
 		// no rate at root and rate of first child has a different prior
 		for(i in 3:nodeCount){
@@ -36,15 +35,15 @@ def get_delta_rates():
 		}
 	}
 	'''
-	return code_str
+    return code_str
 
 
 def get_rates_from_deltas():
-	"""
+    """
 	Create substrates from deltas and rate.
 	Used by MRF
 	"""
-	code_str = '''
+    code_str = '''
 	{
 		// no rate at root and rate of first child has a different prior
 		substrates[map[2,1]] = rate;
@@ -58,18 +57,18 @@ def get_rates_from_deltas():
 		}
 	}
 	'''
-	return code_str
+    return code_str
 
 
 def autocorrelated_prior(heterochronous):
-	"""
+    """
 	Thorne et al 1998
 	mu_i = log(r_a)
 	sigma_i = nu*t_i
 
 	log(r_i) ~ N(mu_i, sigma_i^2)
 	"""
-	code_str = '''
+    code_str = '''
 	real logn_autocorrelated_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
@@ -94,14 +93,14 @@ def autocorrelated_prior(heterochronous):
 		return logP;
 	}}
 '''
-	if heterochronous:
-		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
-	else:
-		return code_str.format('', '')
+    if heterochronous:
+        return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+    else:
+        return code_str.format('', '')
 
 
 def acln_prior(heterochronous):
-	"""
+    """
 	Kishino et al 2001 autocorrelated lognormal model
 
 	sigma_i = (nu*t_i)^1/2
@@ -110,7 +109,7 @@ def acln_prior(heterochronous):
 
 	r_i ~ LN(mu_i, sigma_i)
 	"""
-	code_str = '''
+    code_str = '''
 	real acln_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
@@ -135,14 +134,14 @@ def acln_prior(heterochronous):
 		return logP;
 	}}
 '''
-	if heterochronous:
-		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
-	else:
-		return code_str.format('', '')
+    if heterochronous:
+        return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+    else:
+        return code_str.format('', '')
 
 
 def acg_prior(heterochronous):
-	"""
+    """
 	Aris-Brosou and Yang 2002 autocorrelated gamma model
 
 	E[r_i|r_a] = r_a = shape_i/rate_i
@@ -153,7 +152,7 @@ def acg_prior(heterochronous):
 
 	r_i ~ Gamma(shape_i, rate_i)
 	"""
-	code_str = '''
+    code_str = '''
 	real acg_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
@@ -178,20 +177,20 @@ def acg_prior(heterochronous):
 		return logP;
 	}}
 '''
-	if heterochronous:
-		return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
-	else:
-		return code_str.format('', '')
+    if heterochronous:
+        return code_str.format(', real[] lowers', ' - lowers[map[i,1]]')
+    else:
+        return code_str.format('', '')
 
 
 def ace_prior():
-	"""
+    """
 	Aris-Brosou and Yang 2002 autocorrelated exponential model
 	E[r_i] = r_a
 
 	r_i ~ Exp(1/r_a)
 	"""
-	code_str = '''
+    code_str = '''
 	real ace_log(real[] rates, int[,] map){
 		int nodeCount = size(rates) + 1;
 		real logP = 0.0;
@@ -207,15 +206,15 @@ def ace_prior():
 		return logP;
 	}
 '''
-	return code_str
+    return code_str
 
 
 def aoup_prior(heterochronous):
-	'''
+    '''
 	Aris-Brous & Yang 2002 Ornstein-Uhlenbeck process
 	nu is sigma^2
 	'''
-	str = '''
+    str = '''
 	real aoup_log(real[] rates, vector heights, int[,] map, real beta, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
@@ -240,15 +239,15 @@ def aoup_prior(heterochronous):
 		return logP;
 	}}
 '''
-	if heterochronous:
-		return str.format(', real[] lowers', ' - lowers[map[i,1]]')
-	else:
-		return str.format('', '')
+    if heterochronous:
+        return str.format(', real[] lowers', ' - lowers[map[i,1]]')
+    else:
+        return str.format('', '')
 
 
 def ctmc_scale_prior():
-	# Code adapted from https://github.com/beast-dev/beast-mcmc/blob/master/src/dr/evomodel/tree/CTMCScalePrior.java
-	ctmc_scale = """
+    # Code adapted from https://github.com/beast-dev/beast-mcmc/blob/master/src/dr/evomodel/tree/CTMCScalePrior.java
+    ctmc_scale = """
 	real ctmc_scale_log(real rate, vector blens){
 		real total_tree_time = sum(blens);
 		real log_normalization = 0.5 * log(total_tree_time) - 0.5723649263381958; //lgamma(0.5);
@@ -256,11 +255,11 @@ def ctmc_scale_prior():
 		return log_like;
 	}
 """
-	return ctmc_scale
+    return ctmc_scale
 
 
 def get_weibull(invariant=False):
-	weibull_pinv_site_rates = """
+    weibull_pinv_site_rates = """
 		{
 			real m = 0;
 			real cat = C - 1;
@@ -277,7 +276,7 @@ def get_weibull(invariant=False):
 			}
 		}
 """
-	weibull_site_rates = """
+    weibull_site_rates = """
 		{
 			real m = 0;
 			for(i in 1:C){
@@ -289,14 +288,14 @@ def get_weibull(invariant=False):
 			}
 		}
 """
-	if invariant:
-		return weibull_pinv_site_rates
-	else:
-		return weibull_site_rates
+    if invariant:
+        return weibull_pinv_site_rates
+    else:
+        return weibull_site_rates
 
 
 def constant_coalescent():
-	constant_coalescent_str = """
+    constant_coalescent_str = """
 	real constant_coalescent_log(vector heights, real popSize, int[,] map){
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
@@ -310,11 +309,11 @@ def constant_coalescent():
 		return -sum(intervals .* ((lineageCount .* (lineageCount-1.0))/2.0)) / popSize - (S-1)*log(popSize);
 	}
 	"""
-	return constant_coalescent_str
+    return constant_coalescent_str
 
 
 def skyride_coalescent():
-	skyride_coalescent_str = """
+    skyride_coalescent_str = """
 	real skyride_coalescent_log(vector heights, vector logPopSize, int[,] map){
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
@@ -336,11 +335,11 @@ def skyride_coalescent():
 		return -sum(intervals .* ((lineageCount .* (lineageCount-1.0))/2.0) ./ popSize[popIndicesSorted]) - sum(logPopSize); 
 	}
 """
-	return skyride_coalescent_str
+    return skyride_coalescent_str
 
 
 def skygrid_coalescent():
-	skygrid_coalescent_str = """
+    skygrid_coalescent_str = """
 	real skygrid_coalescent_log(vector heights, vector logPopSize, int[,] map, vector grid){
 		int G = rows(grid);
 		int nodeCount = rows(heights);
@@ -374,11 +373,11 @@ def skygrid_coalescent():
 		return logP;
 	}
 """
-	return skygrid_coalescent_str
+    return skygrid_coalescent_str
 
 
 def GMRF():
-	gmrf_logP = """
+    gmrf_logP = """
 	// Not time aware
 	real gmrf_log(vector logPopSize, real precision){
 		int N = rows(logPopSize) - 1;
@@ -386,11 +385,11 @@ def GMRF():
 		return log(precision)*N/2.0 - (logPopSizeDiff' * logPopSizeDiff)*precision/2.0 - N/2.0 * log(2.0*pi());
 	}
 """
-	return gmrf_logP
+    return gmrf_logP
 
 
 def GMRF_time_aware():
-	gmrf_logP = """
+    gmrf_logP = """
 	// Time aware (mid-point)
 	real gmrf_log(vector logPopSize, real precision, vector heights, int[,] map){
 		int nodeCount = rows(heights);
@@ -436,19 +435,19 @@ def GMRF_time_aware():
 		return log(precision)*(realN - 1.0)/2.0 - s*precision/2.0 - (realN - 1.0)/2.0 * log(2.0*pi());
 	}
 """
-	return gmrf_logP
+    return gmrf_logP
 
 
 def branch_lengths_rate_product(strict):
-	if strict:
-		model_heights_to_blens = 'blens = rate*blensUnscaled;'
-	else:
-		model_heights_to_blens = 'blens = substrates*blensUnscaled;'
-	return model_heights_to_blens
+    if strict:
+        model_heights_to_blens = 'blens = rate*blensUnscaled;'
+    else:
+        model_heights_to_blens = 'blens = substrates*blensUnscaled;'
+    return model_heights_to_blens
 
 
 def branch_lengths_rates_product_autocorr():
-	model_heights_to_blens = """
+    model_heights_to_blens = """
 	blens[map[2,1]] = blensUnscaled[map[2,1]]*substrates[map[2,1]];
 	for( j in 3:nodeCount ){
 		if(map[j,2] == nodeCount){
@@ -459,11 +458,11 @@ def branch_lengths_rates_product_autocorr():
 		}
 	}
 """
-	return model_heights_to_blens
+    return model_heights_to_blens
 
-	
+
 def transform_heights(heterochronous=False):
-	transform_str = """
+    transform_str = """
 	// transform node heights to proportion, except for the root
 	vector transform(real[] p, real rootHeight, int[,] map{0}){{
 		int S = size(p)+2;
@@ -487,14 +486,19 @@ def transform_heights(heterochronous=False):
 	}}
 	"""
 
-	if heterochronous:
-		return transform_str.format(', real[] lowers', 'lowers[map[i,1]] + ', ' - lowers[map[i,1]]', 'lowers[map[i,1]]')
-	else:
-		return transform_str.format('', '', '', '0.0')
+    if heterochronous:
+        return transform_str.format(
+            ', real[] lowers',
+            'lowers[map[i,1]] + ',
+            ' - lowers[map[i,1]]',
+            'lowers[map[i,1]]',
+        )
+    else:
+        return transform_str.format('', '', '', '0.0')
 
 
 def jacobian(heterochronous=False):
-	log_det_jacobian = """
+    log_det_jacobian = """
 	// add log det jacobian
 	for( i in 2:nodeCount ){{
 		// skip leaves
@@ -503,14 +507,14 @@ def jacobian(heterochronous=False):
 		}}
 	}}
 """
-	if heterochronous:
-		return log_det_jacobian.format(' - lowers[map[i,1]]')
-	else:
-		return log_det_jacobian.format('')
+    if heterochronous:
+        return log_det_jacobian.format(' - lowers[map[i,1]]')
+    else:
+        return log_det_jacobian.format('')
 
 
 def JC69(C=1, invariant=False):
-	jc69_function_str = '''
+    jc69_function_str = '''
 	matrix[] calculate_jc69_p_matrices(vector blens{0}){{
 		{1}
 		int bcount = rows(blens);
@@ -531,14 +535,16 @@ def JC69(C=1, invariant=False):
 	}}
 	'''
 
-	if C > 1 or invariant:
-		return jc69_function_str.format(', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}')
-	else:
-		return jc69_function_str.format(*['']*6)
+    if C > 1 or invariant:
+        return jc69_function_str.format(
+            ', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}'
+        )
+    else:
+        return jc69_function_str.format(*[''] * 6)
 
 
 def HKY(C=1, invariant=False):
-	hky_function_str = '''
+    hky_function_str = '''
 	matrix[] calculate_hky_p_matrices(vector freqs, real kappa, vector blens{0}){{
 		{1}
 		int bcount = rows(blens);
@@ -587,14 +593,16 @@ def HKY(C=1, invariant=False):
 	}}
 '''
 
-	if C > 1 or invariant:
-		return hky_function_str.format(', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}')
-	else:
-		return hky_function_str.format('', '', '', '', '', '')
+    if C > 1 or invariant:
+        return hky_function_str.format(
+            ', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}'
+        )
+    else:
+        return hky_function_str.format('', '', '', '', '', '')
 
 
 def GTR(C=1, invariant=False):
-	gtr_function_str = '''
+    gtr_function_str = '''
 	matrix[] calculate_gtr_p_matrices(vector freqs, vector rates, vector blens{0}){{
 		{1}
 		int bcount = rows(blens);
@@ -643,14 +651,16 @@ def GTR(C=1, invariant=False):
 	}}
 	'''
 
-	if C > 1 or invariant:
-		return gtr_function_str.format(', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}')
-	else:
-		return gtr_function_str.format('', '', '', '', '', '')
+    if C > 1 or invariant:
+        return gtr_function_str.format(
+            ', vector rs', 'int C = rows(rs);', '*C', 'for(c in 1:C){', '*rs[c]', '}'
+        )
+    else:
+        return gtr_function_str.format('', '', '', '', '', '')
 
 
 def P_matrix_function():
-	function_str = '''
+    function_str = '''
 	matrix[] calculate_p_matrices(int states, vector freqs, vector rates, vector blens){
 		int bcount = rows(blens);
 		matrix[states,states] pmats[bcount]; // probability matrices
@@ -706,7 +716,7 @@ def P_matrix_function():
 		return pmats;
 	}
 	'''
-	return function_str
+    return function_str
 
 
 one_on_X = """
@@ -715,8 +725,9 @@ one_on_X = """
 	}
 """
 
+
 def likelihood(mixture, clock=True):
-	init_tip_partials = """
+    init_tip_partials = """
 	// copy tip data into node probability vector
 	for( n in 1:S ) {
 		for( i in 1:L ) {
@@ -724,7 +735,7 @@ def likelihood(mixture, clock=True):
 		}
 	}
 """
-	init_tip_partials_mixture="""
+    init_tip_partials_mixture = """
 	// copy tip data into node probability vector
 	for(c in 1:C){
 		for( n in 1:S ) {
@@ -734,7 +745,7 @@ def likelihood(mixture, clock=True):
 		}
 	}
 """
-	model_calculate_logP = """
+    model_calculate_logP = """
 	// calculate tree likelihood
 	for( i in 1:L ) {
 		for( n in 1:(S-1) ) {
@@ -745,7 +756,7 @@ def likelihood(mixture, clock=True):
 		target += log(sum(partials[2*S,i]))*weights[i];
 	}
 """
-	model_calculate_mixture_logP = """
+    model_calculate_mixture_logP = """
 	// calculate tree likelihood
 	for( i in 1:L ) {
 		for( n in 1:(S-1) ) {
@@ -760,7 +771,7 @@ def likelihood(mixture, clock=True):
 		target += log(sum(probs))*weights[i];
 	}
 """
-	model_calculate_unconstrained_logP = """
+    model_calculate_unconstrained_logP = """
 	// calculate tree likelihood
 	for( i in 1:L ) {
 		for( n in 1:(S-2) ) {
@@ -772,7 +783,7 @@ def likelihood(mixture, clock=True):
 		target += log(sum(partials[peel[S-1,3],i] .* freqs))*weights[i];
 	}
 """
-	model_calculate_unconstrained_mixture_logP = """
+    model_calculate_unconstrained_mixture_logP = """
 	// calculate tree likelihood
 	for( i in 1:L ) {
 		for( n in 1:(S-2) ) {
@@ -789,31 +800,31 @@ def likelihood(mixture, clock=True):
 	}
 """
 
-	if not mixture:
-		model = init_tip_partials
-		if clock:
-			model += '\n' + model_calculate_logP
-		else:
-			model += '\n' + model_calculate_unconstrained_logP
-	else:
-		model = init_tip_partials_mixture
-		if clock:
-			model += '\n' + model_calculate_mixture_logP
-		else:
-			model += '\n' + model_calculate_unconstrained_mixture_logP
+    if not mixture:
+        model = init_tip_partials
+        if clock:
+            model += '\n' + model_calculate_logP
+        else:
+            model += '\n' + model_calculate_unconstrained_logP
+    else:
+        model = init_tip_partials_mixture
+        if clock:
+            model += '\n' + model_calculate_mixture_logP
+        else:
+            model += '\n' + model_calculate_unconstrained_mixture_logP
 
-	return model
+    return model
 
 
 def get_geo_likelihood(rescaling=False, unknown_root_frequencies=True):
-	model_str = """\n
+    model_str = """\n
 	// copy tip data into node probability vector
 	for( n in 1:S ) {
 		partials_geo[n] = geodata[n];
 	}
 """
-	if rescaling:
-		model_str += """ 	
+    if rescaling:
+        model_str += """ 	
 	// calculate geo likelihood
 	for( n in 1:(S-2) ) {
 		partials_geo[peel[n,3]] = (pmats_geo[peel[n,1]]*partials_geo[peel[n,1]]) .* (pmats_geo[peel[n,2]]*partials_geo[peel[n,2]]);
@@ -832,8 +843,8 @@ def get_geo_likelihood(rescaling=False, unknown_root_frequencies=True):
 	// add the site log likelihood
 	target += sum(scaling_factors_geo);
 """
-	else:
-		model_str += """ 	
+    else:
+        model_str += """ 	
 		// calculate geo likelihood
 		for( n in 1:(S-2) ) {
 			partials_geo[peel[n,3]] = (pmats_geo[peel[n,1]]*partials_geo[peel[n,1]]) .* (pmats_geo[peel[n,2]]*partials_geo[peel[n,2]]);
@@ -842,386 +853,478 @@ def get_geo_likelihood(rescaling=False, unknown_root_frequencies=True):
 
 		// add the site log likelihood
 """
-	if unknown_root_frequencies:
-		model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]]));\n'
-	else:
-		model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]] .* freqs_geo));\n'
-	return model_str
+    if unknown_root_frequencies:
+        model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]]));\n'
+    else:
+        model_str += '\n\ttarget += log(sum(partials_geo[peel[S-1,3]] .* freqs_geo));\n'
+    return model_str
 
 
 def get_geo_model(params):
-	data_block = []
-	transformed_data_declarations = []
-	parameters_block = []
-	transformed_parameters_declarations = []
-	model_block_declarations = []
-	model_priors = []
-	model_block = []
-	functions_block = []
+    data_block = []
+    transformed_data_declarations = []
+    parameters_block = []
+    transformed_parameters_declarations = []
+    model_block_declarations = []
+    model_priors = []
+    model_block = []
+    functions_block = []
 
-	data_block.append('int <lower=0> S;                      // number of tips')
-	data_block.append('int <lower=0> STATES;                      // number of states')
-	data_block.append('vector<lower=0,upper=1>[STATES] geodata[S]; // alignment as partials')
-	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
-	data_block.append('vector<lower=0> [2*S-3] blens; // branch lengths')
+    data_block.append('int <lower=0> S;                      // number of tips')
+    data_block.append('int <lower=0> STATES;                      // number of states')
+    data_block.append(
+        'vector<lower=0,upper=1>[STATES] geodata[S]; // alignment as partials'
+    )
+    data_block.append(
+        'int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling'
+    )
+    data_block.append('vector<lower=0> [2*S-3] blens; // branch lengths')
 
-	data_block.append('vector<lower=0>[STATES] frequencies_alpha_geo; // parameters of the prior on frequencies')
-	data_block.append('vector<lower=0>[choose(STATES,2)] rates_alpha_geo;       // parameters of the prior on rates')
+    data_block.append(
+        'vector<lower=0>[STATES] frequencies_alpha_geo; // parameters of the prior on frequencies'
+    )
+    data_block.append(
+        'vector<lower=0>[choose(STATES,2)] rates_alpha_geo;       // parameters of the prior on rates'
+    )
 
-	transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
-	transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
+    transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
+    transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
 
-	model_block_declarations.append('vector[STATES] partials_geo[2*S-1];   // partial probabilities for the S tips and S-1 internal nodes')
-	model_block_declarations.append('matrix[STATES,STATES] pmats_geo[bcount]; // finite-time transition matrices for each branch')
-	if params.rescaling_geo:
-		model_block_declarations.append('vector[S-1] scaling_factors_geo = rep_vector(0.0, S-1);')
-		model_block_declarations.append('real max_partials_geo;')
+    model_block_declarations.append(
+        'vector[STATES] partials_geo[2*S-1];   // partial probabilities for the S tips and S-1 internal nodes'
+    )
+    model_block_declarations.append(
+        'matrix[STATES,STATES] pmats_geo[bcount]; // finite-time transition matrices for each branch'
+    )
+    if params.rescaling_geo:
+        model_block_declarations.append(
+            'vector[S-1] scaling_factors_geo = rep_vector(0.0, S-1);'
+        )
+        model_block_declarations.append('real max_partials_geo;')
 
-	parameters_block.append('vector<lower=0>[rateCount_geo] rates_geo;')
-	parameters_block.append('simplex[STATES] freqs_geo;')
+    parameters_block.append('vector<lower=0>[rateCount_geo] rates_geo;')
+    parameters_block.append('simplex[STATES] freqs_geo;')
 
-	model_priors.append('freqs_geo ~ dirichlet(frequencies_alpha_geo);')
-	model_priors.append('rates_geo ~ gamma(1,1);')
+    model_priors.append('freqs_geo ~ dirichlet(frequencies_alpha_geo);')
+    model_priors.append('rates_geo ~ gamma(1,1);')
 
-	functions_block.append(P_matrix_function())
+    functions_block.append(P_matrix_function())
 
-	model_block.append('pmats_geo = calculate_p_matrices(STATES, freqs_geo, rates_geo, blens);')
+    model_block.append(
+        'pmats_geo = calculate_p_matrices(STATES, freqs_geo, rates_geo, blens);'
+    )
 
-	model_block.append(get_geo_likelihood(params.rescaling_geo))
+    model_block.append(get_geo_likelihood(params.rescaling_geo))
 
-	script = ''
+    script = ''
 
-	if len(functions_block) > 0:
-		script += 'functions{' + '\n'.join(functions_block) + '\n}\n\n'
+    if len(functions_block) > 0:
+        script += 'functions{' + '\n'.join(functions_block) + '\n}\n\n'
 
-	script += 'data{\n' + '\t' + '\n\t'.join(data_block) + '\n}\n\n'
+    script += 'data{\n' + '\t' + '\n\t'.join(data_block) + '\n}\n\n'
 
-	if len(transformed_data_declarations) != 0:
-		script += 'transformed data{\n'
-		script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
-		script += '}\n\n'
+    if len(transformed_data_declarations) != 0:
+        script += 'transformed data{\n'
+        script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
+        script += '}\n\n'
 
-	script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
+    script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
 
-	if len(transformed_parameters_declarations) != 0:
-		script += 'transformed parameters{\n'
-		script += '\t' + '\n\t'.join(transformed_parameters_declarations) + '\n\n'
+    if len(transformed_parameters_declarations) != 0:
+        script += 'transformed parameters{\n'
+        script += '\t' + '\n\t'.join(transformed_parameters_declarations) + '\n\n'
 
-	script += 'model{\n'
-	script += '\t' + '\n\t'.join(model_block_declarations) + '\n\n'
-	script += '\t' + '\n\t'.join(model_priors) + '\n\n'
-	script += '\t' + '\n\t'.join(model_block) + '\n}\n\n'
+    script += 'model{\n'
+    script += '\t' + '\n\t'.join(model_block_declarations) + '\n\n'
+    script += '\t' + '\n\t'.join(model_priors) + '\n\n'
+    script += '\t' + '\n\t'.join(model_block) + '\n}\n\n'
 
-	return script
+    return script
 
 
 def get_model(params):
-	if params.geo:
-		return get_geo_model(params)
+    if params.geo:
+        return get_geo_model(params)
 
-	functions_block = []
+    functions_block = []
 
-	data_block = []
-	transformed_data_declarations = []
-	transformed_data_block = []
+    data_block = []
+    transformed_data_declarations = []
+    transformed_data_block = []
 
-	parameters_block = []
-	transformed_parameters_declarations = []
-	transformed_parameters_block = []
+    parameters_block = []
+    transformed_parameters_declarations = []
+    transformed_parameters_block = []
 
-	model_block_declarations = []
-	model_priors = []
-	model_block = []
+    model_block_declarations = []
+    model_priors = []
+    model_block = []
 
-	data_block.append('int <lower=0> L;                      // alignment length')
-	data_block.append('int <lower=0> S;                      // number of tips')
-	data_block.append('vector<lower=0,upper=1>[4] tipdata[S,L]; // alignment as partials')
-	data_block.append('int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling')
-	data_block.append('real weights[L];')
+    data_block.append('int <lower=0> L;                      // alignment length')
+    data_block.append('int <lower=0> S;                      // number of tips')
+    data_block.append(
+        'vector<lower=0,upper=1>[4] tipdata[S,L]; // alignment as partials'
+    )
+    data_block.append(
+        'int <lower=0,upper=2*S> peel[S-1,3];  // list of nodes for peeling'
+    )
+    data_block.append('real weights[L];')
 
-	if params.clock is None:
-		transformed_data_declarations.append('int bcount = 2*S-3; // number of branches')
-	else:
-		data_block.append('int map[2*S-1,2];                     // list of node in preorder [node,parent]')
-		transformed_data_declarations.append('int bcount = 2*S-2; // number of branches')
-	transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
+    if params.clock is None:
+        transformed_data_declarations.append(
+            'int bcount = 2*S-3; // number of branches'
+        )
+    else:
+        data_block.append(
+            'int map[2*S-1,2];                     // list of node in preorder [node,parent]'
+        )
+        transformed_data_declarations.append(
+            'int bcount = 2*S-2; // number of branches'
+        )
+    transformed_data_declarations.append('int nodeCount = 2*S-1; // number of nodes')
 
-	# Site model
-	if params.invariant or params.categories > 1:
-		data_block.append('int C;')
-		model_block_declarations.append('real probs[C];')
-		model_block_declarations.append('vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
-		model_block_declarations.append('matrix[4,4] pmats[bcount*C]; // finite-time transition matrices for each branch')
-	else:
-		model_block_declarations.append('vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes')
-		model_block_declarations.append('matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch')
+    # Site model
+    if params.invariant or params.categories > 1:
+        data_block.append('int C;')
+        model_block_declarations.append('real probs[C];')
+        model_block_declarations.append(
+            'vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes'
+        )
+        model_block_declarations.append(
+            'matrix[4,4] pmats[bcount*C]; // finite-time transition matrices for each branch'
+        )
+    else:
+        model_block_declarations.append(
+            'vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes'
+        )
+        model_block_declarations.append(
+            'matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch'
+        )
 
-	if params.categories > 1 and params.heterogeneity == 'weibull':
-		transformed_data_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
+    if params.categories > 1 and params.heterogeneity == 'weibull':
+        transformed_data_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
 
-		parameters_block.append('real<lower=0.1> wshape;')
-		if params.invariant:
-			parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
-			model_priors.append('pinv ~ uniform(0.0,1.0);')
+        parameters_block.append('real<lower=0.1> wshape;')
+        if params.invariant:
+            parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
+            model_priors.append('pinv ~ uniform(0.0,1.0);')
 
-		transformed_parameters_declarations.append('vector[C] rs;')
-		transformed_parameters_block.append(get_weibull(params.invariant))
+        transformed_parameters_declarations.append('vector[C] rs;')
+        transformed_parameters_block.append(get_weibull(params.invariant))
 
-		model_priors.append('wshape ~ exponential(1.0);')
-	elif params.categories > 1 and not params.invariant:
-		parameters_block.append('simplex[C]  ps;')
-		parameters_block.append('simplex[C] rate_unscaled;')
+        model_priors.append('wshape ~ exponential(1.0);')
+    elif params.categories > 1 and not params.invariant:
+        parameters_block.append('simplex[C]  ps;')
+        parameters_block.append('simplex[C] rate_unscaled;')
 
-		transformed_parameters_declarations.append('vector[C] rs;')
-		transformed_parameters_declarations.append('simplex[C] constraint;')
+        transformed_parameters_declarations.append('vector[C] rs;')
+        transformed_parameters_declarations.append('simplex[C] constraint;')
 
-		transformed_parameters_block.append('constraint = ps .* rate_unscaled; // not actually a simplex yet')
-		transformed_parameters_block.append('rs = rate_unscaled / sum(constraint);')
-		transformed_parameters_block.append('constraint /= sum(constraint); // is now a simplex that equals p .* x ')
-	elif params.invariant and params.categories == 1:
-		transformed_data_declarations.append('int C = 2;')
-		
-		parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
+        transformed_parameters_block.append(
+            'constraint = ps .* rate_unscaled; // not actually a simplex yet'
+        )
+        transformed_parameters_block.append('rs = rate_unscaled / sum(constraint);')
+        transformed_parameters_block.append(
+            'constraint /= sum(constraint); // is now a simplex that equals p .* x '
+        )
+    elif params.invariant and params.categories == 1:
+        transformed_data_declarations.append('int C = 2;')
 
-		transformed_parameters_declarations.append('vector[2] ps;')
-		transformed_parameters_declarations.append('vector[2] rs;')
+        parameters_block.append('real<lower=0.0, upper=1.0> pinv;')
 
-		transformed_parameters_block.append('ps[1] = pinv;')
-		transformed_parameters_block.append('ps[2] = 1.0 - pinv;')
-		transformed_parameters_block.append('rs[1] = 0.0;')
-		transformed_parameters_block.append('rs[2] = 1.0/(1.0 - pinv);')
-		
-		model_priors.append('pinv ~ uniform(0.0,1.0);')
-	elif params.invariant and params.categories > 1:
-		raise ValueError('Cannot use proportion of invariant and discrete rate heterogeneity yet.')
+        transformed_parameters_declarations.append('vector[2] ps;')
+        transformed_parameters_declarations.append('vector[2] rs;')
 
-	# Clock model
-	if params.clock is not None:
-		model_block_declarations.append('vector [bcount] blens; // branch lengths')
+        transformed_parameters_block.append('ps[1] = pinv;')
+        transformed_parameters_block.append('ps[2] = 1.0 - pinv;')
+        transformed_parameters_block.append('rs[1] = 0.0;')
+        transformed_parameters_block.append('rs[2] = 1.0/(1.0 - pinv);')
 
-		transformed_data_declarations.append('int pCount = S-2; // number of proportions')
+        model_priors.append('pinv ~ uniform(0.0,1.0);')
+    elif params.invariant and params.categories > 1:
+        raise ValueError(
+            'Cannot use proportion of invariant and discrete rate heterogeneity yet.'
+        )
 
-		parameters_block.append('real <lower=0,upper=1> props[pCount]; // proportions')
-		transformed_parameters_declarations.append('vector <lower=0> [2*S-1] heights;')
+        # Clock model
+    if params.clock is not None:
+        model_block_declarations.append('vector [bcount] blens; // branch lengths')
 
-		transformed_parameters_declarations.append(
-			'vector<lower=0> [bcount] blensUnscaled; // unscaled branch lengths')
+        transformed_data_declarations.append(
+            'int pCount = S-2; // number of proportions'
+        )
 
-		if params.estimate_rate:
-			if params.clock == 'strict':
-				parameters_block.append('real <lower=0> rate;')
-				if params.clockpr == 'ctmcscale':
-					functions_block.append(ctmc_scale_prior())
-					model_priors.append('rate ~ ctmc_scale(blensUnscaled);')
-				else:
-					model_priors.append('rate ~ exponential(1000);')
-			elif params.clock.endswith('mrf'):
-				transformed_parameters_declarations.append('real substrates[bcount];')
-				parameters_block.append('real deltas[2*S-3];')
-				parameters_block.append('real<lower=0> rate;')
-				transformed_parameters_block.append(get_rates_from_deltas())
-				parameters_block.append('real <lower=0> zeta;')
-				if params.clock == 'hsmrf':
-					parameters_block.append('vector<lower=0>[bcount-1] gammas;') # local scales
-					model_priors.append('deltas ~ normal(0, zeta*gammas*0.0014);') # global scale
-					model_priors.append('gammas ~ cauchy(0, 1);')
-				elif params.clock == 'gmrf':
-					model_priors.append('deltas ~ normal(0, zeta*0.0014);')
-				model_priors.append('zeta ~ cauchy(0, 1);')
-				model_priors.append('rate ~ exponential(1000);')
-			else:
-				parameters_block.append('real <lower=0> substrates[bcount];')
-				if params.clock == 'ace':
-					functions_block.append(ace_prior())
-					model_priors.append('substrates ~ ace(map);')
-					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-				elif params.clock == 'acln':
-					parameters_block.append('real <lower=0> nu;')
-					functions_block.append(acln_prior(params.heterochronous))
-					model_priors.append('nu ~ exponential(1);')
-					if params.heterochronous:
-						model_priors.append('substrates ~ acln(heights, map, nu, lowers);')
-					else:
-						model_priors.append('substrates ~ acln(heights, map, nu);')
-					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-				elif params.clock == 'acg':
-					parameters_block.append('real <lower=0> nu;')
-					functions_block.append(acg_prior(params.heterochronous))
-					model_priors.append('nu ~ exponential(1);')
-					if params.heterochronous:
-						model_priors.append('substrates ~ acg(heights, map, nu, lowers);')
-					else:
-						model_priors.append('substrates ~ acg(heights, map, nu);')
-					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-				elif params.clock == 'aoup':
-					parameters_block.append('real <lower=0> beta;')
-					parameters_block.append('real <lower=0> sigma;')
-					functions_block.append(aoup_prior(params.heterochronous))
-					if params.heterochronous:
-						model_priors.append('substrates ~ aoup(heights, map, beta, sigma, lowers);')
-					else:
-						model_priors.append('substrates ~ aoup(heights, map, beta, sigma);')
-					model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
-				elif params.clock == 'ucln':
-					parameters_block.append('real <lower=0> ucln_mean;')
-					parameters_block.append('real <lower=0> ucln_stdev;')
-					#model_priors.append('substrates ~ lognormal(log(ucln_mean/sqrt(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))), sqrt(log(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))));')
-					model_priors.append('substrates ~ lognormal(log(ucln_mean)-ucln_stdev*ucln_stdev*0.5, ucln_stdev);')
-					model_priors.append('ucln_mean ~ exponential(1000);')
-					model_priors.append('ucln_stdev ~ gamma(0.5396, 2.6184);')
-					# model_priors.append('ucln_stdev ~ exponential(3);')
-				elif params.clock == 'uced':
-					parameters_block.append('real <lower=0> uced_mean;')
-					model_priors.append('substrates ~ exponential(1.0/uced_mean);')
-					model_priors.append('uced_mean ~ exponential(1000);')
-		else:
-			data_block.append('real <lower=0> rate;')
+        parameters_block.append('real <lower=0,upper=1> props[pCount]; // proportions')
+        transformed_parameters_declarations.append('vector <lower=0> [2*S-1] heights;')
 
-		functions_block.append(transform_heights(params.heterochronous))
-		data_block.append('real lower_root;')
-		if params.heterochronous:
-			data_block.append('real lowers[2*S-1]; // list of lower bounds for each internal node (for reparametrization)')
-			parameters_block.append('real <lower=lower_root> height; // root height')
-			transformed_parameters_block.append('heights = transform(props, height, map, lowers);')
-		else:
-			parameters_block.append('real<lower=lower_root> height; // root height')
-			transformed_parameters_block.append('heights = transform(props, height, map);')
+        transformed_parameters_declarations.append(
+            'vector<lower=0> [bcount] blensUnscaled; // unscaled branch lengths'
+        )
 
-		transformed_parameters_block.append('blensUnscaled[map[2:,1]] = heights[map[2:,2]] - heights[map[2:,1]];')
+        if params.estimate_rate:
+            if params.clock == 'strict':
+                parameters_block.append('real <lower=0> rate;')
+                if params.clockpr == 'ctmcscale':
+                    functions_block.append(ctmc_scale_prior())
+                    model_priors.append('rate ~ ctmc_scale(blensUnscaled);')
+                else:
+                    model_priors.append('rate ~ exponential(1000);')
+            elif params.clock.endswith('mrf'):
+                transformed_parameters_declarations.append('real substrates[bcount];')
+                parameters_block.append('real deltas[2*S-3];')
+                parameters_block.append('real<lower=0> rate;')
+                transformed_parameters_block.append(get_rates_from_deltas())
+                parameters_block.append('real <lower=0> zeta;')
+                if params.clock == 'hsmrf':
+                    parameters_block.append(
+                        'vector<lower=0>[bcount-1] gammas;'
+                    )  # local scales
+                    model_priors.append(
+                        'deltas ~ normal(0, zeta*gammas*0.0014);'
+                    )  # global scale
+                    model_priors.append('gammas ~ cauchy(0, 1);')
+                elif params.clock == 'gmrf':
+                    model_priors.append('deltas ~ normal(0, zeta*0.0014);')
+                model_priors.append('zeta ~ cauchy(0, 1);')
+                model_priors.append('rate ~ exponential(1000);')
+            else:
+                parameters_block.append('real <lower=0> substrates[bcount];')
+                if params.clock == 'ace':
+                    functions_block.append(ace_prior())
+                    model_priors.append('substrates ~ ace(map);')
+                    model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+                elif params.clock == 'acln':
+                    parameters_block.append('real <lower=0> nu;')
+                    functions_block.append(acln_prior(params.heterochronous))
+                    model_priors.append('nu ~ exponential(1);')
+                    if params.heterochronous:
+                        model_priors.append(
+                            'substrates ~ acln(heights, map, nu, lowers);'
+                        )
+                    else:
+                        model_priors.append('substrates ~ acln(heights, map, nu);')
+                    model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+                elif params.clock == 'acg':
+                    parameters_block.append('real <lower=0> nu;')
+                    functions_block.append(acg_prior(params.heterochronous))
+                    model_priors.append('nu ~ exponential(1);')
+                    if params.heterochronous:
+                        model_priors.append(
+                            'substrates ~ acg(heights, map, nu, lowers);'
+                        )
+                    else:
+                        model_priors.append('substrates ~ acg(heights, map, nu);')
+                    model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+                elif params.clock == 'aoup':
+                    parameters_block.append('real <lower=0> beta;')
+                    parameters_block.append('real <lower=0> sigma;')
+                    functions_block.append(aoup_prior(params.heterochronous))
+                    if params.heterochronous:
+                        model_priors.append(
+                            'substrates ~ aoup(heights, map, beta, sigma, lowers);'
+                        )
+                    else:
+                        model_priors.append(
+                            'substrates ~ aoup(heights, map, beta, sigma);'
+                        )
+                    model_priors.append('substrates[map[2,1]] ~ exponential(1000);')
+                elif params.clock == 'ucln':
+                    parameters_block.append('real <lower=0> ucln_mean;')
+                    parameters_block.append('real <lower=0> ucln_stdev;')
+                    # model_priors.append('substrates ~ lognormal(log(ucln_mean/sqrt(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))), sqrt(log(1.0 + (ucln_stdev*ucln_stdev)/(ucln_mean*ucln_mean))));')
+                    model_priors.append(
+                        'substrates ~ lognormal(log(ucln_mean)-ucln_stdev*ucln_stdev*0.5, ucln_stdev);'
+                    )
+                    model_priors.append('ucln_mean ~ exponential(1000);')
+                    model_priors.append('ucln_stdev ~ gamma(0.5396, 2.6184);')
+                    # model_priors.append('ucln_stdev ~ exponential(3);')
+                elif params.clock == 'uced':
+                    parameters_block.append('real <lower=0> uced_mean;')
+                    model_priors.append('substrates ~ exponential(1.0/uced_mean);')
+                    model_priors.append('uced_mean ~ exponential(1000);')
+        else:
+            data_block.append('real <lower=0> rate;')
 
-		if params.clock in ('acln', 'acg', 'ace', 'aoup', 'hsmrf', 'gmrf'):
-			model_block.append(branch_lengths_rates_product_autocorr())
-		else:
-			model_block.append(branch_lengths_rate_product(params.clock == 'strict' or not params.estimate_rate))
+        functions_block.append(transform_heights(params.heterochronous))
+        data_block.append('real lower_root;')
+        if params.heterochronous:
+            data_block.append(
+                'real lowers[2*S-1]; // list of lower bounds for each internal node (for reparametrization)'
+            )
+            parameters_block.append('real <lower=lower_root> height; // root height')
+            transformed_parameters_block.append(
+                'heights = transform(props, height, map, lowers);'
+            )
+        else:
+            parameters_block.append('real<lower=lower_root> height; // root height')
+            transformed_parameters_block.append(
+                'heights = transform(props, height, map);'
+            )
 
-		# Coalescent
-		if params.coalescent == 'constant':
-			functions_block.append(one_on_X)
-			parameters_block.append('real <lower=0> theta;')
-			model_priors.append('theta ~ oneOnX();')
-			functions_block.append(constant_coalescent())
-			model_priors.append('heights ~ constant_coalescent(theta, map);')
-		elif params.coalescent == 'skyride':
-			functions_block.append(skyride_coalescent())
-			if params.time_aware:
-				functions_block.append(GMRF_time_aware())
-			else:
-				transformed_parameters_declarations.append('vector[I-1] deltaThetas = thetas[2:] - thetas[:(I-1)];')
+        transformed_parameters_block.append(
+            'blensUnscaled[map[2:,1]] = heights[map[2:,2]] - heights[map[2:,1]];'
+        )
 
-			data_block.append('int I; // number of intervals')
+        if params.clock in ('acln', 'acg', 'ace', 'aoup', 'hsmrf', 'gmrf'):
+            model_block.append(branch_lengths_rates_product_autocorr())
+        else:
+            model_block.append(
+                branch_lengths_rate_product(
+                    params.clock == 'strict' or not params.estimate_rate
+                )
+            )
 
-			parameters_block.append('vector[I] thetas; // log space')
-			parameters_block.append('real<lower=0> tau;')
+            # Coalescent
+        if params.coalescent == 'constant':
+            functions_block.append(one_on_X)
+            parameters_block.append('real <lower=0> theta;')
+            model_priors.append('theta ~ oneOnX();')
+            functions_block.append(constant_coalescent())
+            model_priors.append('heights ~ constant_coalescent(theta, map);')
+        elif params.coalescent == 'skyride':
+            functions_block.append(skyride_coalescent())
+            if params.time_aware:
+                functions_block.append(GMRF_time_aware())
+            else:
+                transformed_parameters_declarations.append(
+                    'vector[I-1] deltaThetas = thetas[2:] - thetas[:(I-1)];'
+                )
 
-			model_priors.append('heights ~ skyride_coalescent(thetas, map);')
-			if params.time_aware:
-				model_priors.append('thetas ~ gmrf(tau, heights, map);')
-			else:
-				model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
-			model_priors.append('tau ~ gamma(0.001, 0.001);')
-		elif params.coalescent == 'skygrid':
-			functions_block.append(skygrid_coalescent())
+            data_block.append('int I; // number of intervals')
 
-			data_block.append('int G; // number of grid interval')
-			data_block.append('vector<lower=0>[G] grid;')
+            parameters_block.append('vector[I] thetas; // log space')
+            parameters_block.append('real<lower=0> tau;')
 
-			parameters_block.append('real<lower=0> tau;')
+            model_priors.append('heights ~ skyride_coalescent(thetas, map);')
+            if params.time_aware:
+                model_priors.append('thetas ~ gmrf(tau, heights, map);')
+            else:
+                model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
+            model_priors.append('tau ~ gamma(0.001, 0.001);')
+        elif params.coalescent == 'skygrid':
+            functions_block.append(skygrid_coalescent())
 
-			if params.non_centered:
-				parameters_block.append('real theta1;')
-				parameters_block.append('vector[G] deltaThetas;')
-				transformed_parameters_declarations.append('real<lower=0> sigma = 1.0/sqrt(tau);')
-				transformed_parameters_declarations.append('vector[G+1] thetas;')
-				transformed_parameters_block.append('thetas = cumulative_sum(append_row(theta1, sigma * deltaThetas));')
-				model_priors.append('deltaThetas ~ normal(0.0, 1.0);')
-			else:
-				parameters_block.append('vector[G+1] thetas; // log space')
-				transformed_parameters_declarations.append('vector[G] deltaThetas = thetas[2:] - thetas[:G];')
-				model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
+            data_block.append('int G; // number of grid interval')
+            data_block.append('vector<lower=0>[G] grid;')
 
-			model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
-			model_priors.append('tau ~ gamma(0.001, 0.001);')
-	else:
-		parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
-		model_priors.append('blens ~ exponential(10);')
+            parameters_block.append('real<lower=0> tau;')
 
-	if params.speciation == 'bd':
-		functions_block.append(birth_death())
-		parameters_block.append('real<lower=0> netDiversificationRate ;') # lambda-mu
-		parameters_block.append('real<lower=0, upper=1> relativeExtinctionRate;') # mu/lambda
-		model_priors.append('heights ~ birth_death(map, 1, netDiversificationRate, relativeExtinctionRate);')
+            if params.non_centered:
+                parameters_block.append('real theta1;')
+                parameters_block.append('vector[G] deltaThetas;')
+                transformed_parameters_declarations.append(
+                    'real<lower=0> sigma = 1.0/sqrt(tau);'
+                )
+                transformed_parameters_declarations.append('vector[G+1] thetas;')
+                transformed_parameters_block.append(
+                    'thetas = cumulative_sum(append_row(theta1, sigma * deltaThetas));'
+                )
+                model_priors.append('deltaThetas ~ normal(0.0, 1.0);')
+            else:
+                parameters_block.append('vector[G+1] thetas; // log space')
+                transformed_parameters_declarations.append(
+                    'vector[G] deltaThetas = thetas[2:] - thetas[:G];'
+                )
+                model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
 
-	# Substitution model
-	if params.model == 'GTR':
-		data_block.append('vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies')
-		data_block.append('vector<lower=0>[6] rates_alpha;       // parameters of the prior on rates')
+            model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
+            model_priors.append('tau ~ gamma(0.001, 0.001);')
+    else:
+        parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
+        model_priors.append('blens ~ exponential(10);')
 
-		parameters_block.append('simplex[6] rates;')
-		parameters_block.append('simplex[4] freqs;')
+    if params.speciation == 'bd':
+        functions_block.append(birth_death())
+        parameters_block.append('real<lower=0> netDiversificationRate ;')  # lambda-mu
+        parameters_block.append(
+            'real<lower=0, upper=1> relativeExtinctionRate;'
+        )  # mu/lambda
+        model_priors.append(
+            'heights ~ birth_death(map, 1, netDiversificationRate, relativeExtinctionRate);'
+        )
 
-		model_priors.append('rates ~ dirichlet(rates_alpha);')
-		model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
+        # Substitution model
+    if params.model == 'GTR':
+        data_block.append(
+            'vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies'
+        )
+        data_block.append(
+            'vector<lower=0>[6] rates_alpha;       // parameters of the prior on rates'
+        )
 
-		functions_block.append(GTR(params.categories, params.invariant))
-		if params.invariant or params.categories > 1:
-			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens, rs);')
-		else:
-			model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens);')
-	elif params.model == 'HKY':
-		data_block.append('vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies')
+        parameters_block.append('simplex[6] rates;')
+        parameters_block.append('simplex[4] freqs;')
 
-		parameters_block.append('real<lower=0> kappa;')
-		parameters_block.append('simplex[4] freqs;')
+        model_priors.append('rates ~ dirichlet(rates_alpha);')
+        model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
 
-		model_priors.append('kappa ~ lognormal(1.0,1.25);')
-		model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
+        functions_block.append(GTR(params.categories, params.invariant))
+        if params.invariant or params.categories > 1:
+            model_block.append(
+                'pmats = calculate_gtr_p_matrices(freqs, rates, blens, rs);'
+            )
+        else:
+            model_block.append('pmats = calculate_gtr_p_matrices(freqs, rates, blens);')
+    elif params.model == 'HKY':
+        data_block.append(
+            'vector<lower=0>[4] frequencies_alpha; // parameters of the prior on frequencies'
+        )
 
-		functions_block.append(HKY(params.categories, params.invariant))
-		if params.invariant or params.categories > 1:
-			model_block.append('pmats = calculate_hky_p_matrices(freqs, kappa, blens, rs);')
-		else:
-			model_block.append('pmats = calculate_hky_p_matrices(freqs, kappa, blens);')
-	elif params.model == 'JC69':
-		transformed_data_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
-		functions_block.append(JC69(params.categories, params.invariant))
-		if params.invariant or params.categories > 1:
-			model_block.append('pmats = calculate_jc69_p_matrices(blens, rs);')
-		else:
-			model_block.append('pmats = calculate_jc69_p_matrices(blens);')
-	else:
-		raise ValueError('Supports JC69, HKY and GTR only.')
+        parameters_block.append('real<lower=0> kappa;')
+        parameters_block.append('simplex[4] freqs;')
 
-	# Tree likelihood
-	model_block.append(likelihood(params.categories > 1 or params.invariant, params.clock is not None))
+        model_priors.append('kappa ~ lognormal(1.0,1.25);')
+        model_priors.append('freqs ~ dirichlet(frequencies_alpha);')
 
-	if params.clock is not None:
-		model_block.append(jacobian(params.heterochronous))
+        functions_block.append(HKY(params.categories, params.invariant))
+        if params.invariant or params.categories > 1:
+            model_block.append(
+                'pmats = calculate_hky_p_matrices(freqs, kappa, blens, rs);'
+            )
+        else:
+            model_block.append('pmats = calculate_hky_p_matrices(freqs, kappa, blens);')
+    elif params.model == 'JC69':
+        transformed_data_declarations.append('vector[4] freqs = rep_vector(0.25,4);')
+        functions_block.append(JC69(params.categories, params.invariant))
+        if params.invariant or params.categories > 1:
+            model_block.append('pmats = calculate_jc69_p_matrices(blens, rs);')
+        else:
+            model_block.append('pmats = calculate_jc69_p_matrices(blens);')
+    else:
+        raise ValueError('Supports JC69, HKY and GTR only.')
 
-	script = ''
+        # Tree likelihood
+    model_block.append(
+        likelihood(params.categories > 1 or params.invariant, params.clock is not None)
+    )
 
-	if len(functions_block) > 0:
-		script += 'functions{' + '\n'.join(functions_block) + '\n}\n\n'
+    if params.clock is not None:
+        model_block.append(jacobian(params.heterochronous))
 
-	script += 'data{\n' + '\t' + '\n\t'.join(data_block) + '\n}\n\n'
-	
-	if len(transformed_data_declarations) != 0:
-		script += 'transformed data{\n'
-		script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
-		if len(transformed_data_block) > 0:
-			script += '\t' + '\n\t'.join(transformed_data_block) + '\n'
-		script += '}\n\n'
+    script = ''
 
-	script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
-	
-	if len(transformed_parameters_declarations) != 0:
-		script += 'transformed parameters{\n'
-		script += '\t' + '\n\t'.join(transformed_parameters_declarations) + '\n\n'
-		script += '\t' + '\n\t'.join(transformed_parameters_block) + '\n}\n\n'
+    if len(functions_block) > 0:
+        script += 'functions{' + '\n'.join(functions_block) + '\n}\n\n'
 
-	script += 'model{\n'
-	script += '\t' + '\n\t'.join(model_block_declarations) + '\n\n'
-	script += '\t' + '\n\t'.join(model_priors) + '\n\n'
-	script += '\t' + '\n\t'.join(model_block) + '\n}\n\n'
+    script += 'data{\n' + '\t' + '\n\t'.join(data_block) + '\n}\n\n'
 
-	return script
+    if len(transformed_data_declarations) != 0:
+        script += 'transformed data{\n'
+        script += '\t' + '\n\t'.join(transformed_data_declarations) + '\n'
+        if len(transformed_data_block) > 0:
+            script += '\t' + '\n\t'.join(transformed_data_block) + '\n'
+        script += '}\n\n'
 
+    script += 'parameters{\n' + '\t' + '\n\t'.join(parameters_block) + '\n}\n\n'
+
+    if len(transformed_parameters_declarations) != 0:
+        script += 'transformed parameters{\n'
+        script += '\t' + '\n\t'.join(transformed_parameters_declarations) + '\n\n'
+        script += '\t' + '\n\t'.join(transformed_parameters_block) + '\n}\n\n'
+
+    script += 'model{\n'
+    script += '\t' + '\n\t'.join(model_block_declarations) + '\n\n'
+    script += '\t' + '\n\t'.join(model_priors) + '\n\n'
+    script += '\t' + '\n\t'.join(model_block) + '\n}\n\n'
+
+    return script

@@ -1,5 +1,6 @@
-import numpy
 import csv
+
+import numpy
 
 
 def setup_dates(tree, dates=None, heterochronous=False):
@@ -60,8 +61,7 @@ def get_peeling_order(tree):
     peeling = []
     for node in tree.postorder_node_iter():
         if not node.is_leaf():
-            peeling.append(
-                [x.index for x in node.child_node_iter()] + [node.index])
+            peeling.append([x.index for x in node.child_node_iter()] + [node.index])
     return peeling
 
 
@@ -85,13 +85,18 @@ def get_lowers(tree):
             ll[node] = max([ll[x] for x in node.child_node_iter()])
 
     for node in tree.preorder_node_iter():
-        lowers[node.index-1] = ll[node]
+        lowers[node.index - 1] = ll[node]
     return lowers
 
 
 def get_dna_leaves_partials(alignment):
     tipdata = numpy.zeros((len(alignment), alignment.sequence_size, 4), dtype=numpy.int)
-    dna_map = {'a': [1, 0, 0, 0], 'c': [0, 1, 0, 0], 'g': [0, 0, 1, 0], 't': [0, 0, 0, 1]}
+    dna_map = {
+        'a': [1, 0, 0, 0],
+        'c': [0, 1, 0, 0],
+        'g': [0, 0, 1, 0],
+        't': [0, 0, 0, 1],
+    }
 
     s = 0
     for name in alignment:
@@ -125,7 +130,12 @@ def get_dna_leaves_partials_compressed(alignment):
 
     tipdata = numpy.zeros((len(alignment), len(patterns.keys()), 4), dtype=numpy.int)
 
-    dna_map = {'a': [1, 0, 0, 0], 'c': [0, 1, 0, 0], 'g': [0, 0, 1, 0], 't': [0, 0, 0, 1]}
+    dna_map = {
+        'a': [1, 0, 0, 0],
+        'c': [0, 1, 0, 0],
+        'g': [0, 0, 1, 0],
+        't': [0, 0, 0, 1],
+    }
 
     s = 0
     for name in alignment:
@@ -163,7 +173,14 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
     taxaCount = len(tree.taxon_namespace)
     outp = open(output, 'w')
     outp.write('#NEXUS\nBegin trees;\nTranslate\n')
-    outp.write(',\n'.join([str(i + 1) + ' ' + x.label.replace("'", '') for i, x in enumerate(tree.taxon_namespace)]))
+    outp.write(
+        ',\n'.join(
+            [
+                str(i + 1) + ' ' + x.label.replace("'", '')
+                for i, x in enumerate(tree.taxon_namespace)
+            ]
+        )
+    )
     outp.write('\n;\n')
 
     time = False
@@ -196,7 +213,7 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
                     l = line.split(',')
                     for n in tree.postorder_node_iter():
                         if not n.is_leaf():
-                            n.date = float(l[hindex + n.index-taxaCount - 1])
+                            n.date = float(l[hindex + n.index - taxaCount - 1])
                     if strict:
                         for n in tree.postorder_node_iter():
                             if n.parent_node is not None:
@@ -204,7 +221,7 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
                     else:
                         for n in tree.postorder_node_iter():
                             if n.parent_node is not None:
-                                n.rate = float(l[rindex + n.index-1])
+                                n.rate = float(l[rindex + n.index - 1])
 
                     for n in tree.postorder_node_iter():
                         if n.parent_node is not None:
@@ -254,7 +271,7 @@ def parse_log(inputfile, alpha=0.05, tree=None):
         'netDiversificationRate': 'net diversification rate',
         'relativeExtinctionRate': 'relative extinction rate',
         'ucln_mean': 'UCLN mean',
-        'ucln_stdev': 'UCLN stdev'
+        'ucln_stdev': 'UCLN stdev',
     }
     with open(inputfile) as fp:
         for line in fp:
@@ -270,18 +287,30 @@ def parse_log(inputfile, alpha=0.05, tree=None):
             if var == 'rates.1':
                 print('GTR')
                 for i in range(6):
-                    d = data[header.index('rates.'+str(i+1))]
+                    d = data[header.index('rates.' + str(i + 1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.3E} {}% CI: ({:.3E},{:.3E})'.format(GTR[i], mean, (1-alpha)*100, low, high))
+                    print(
+                        '  {} mean: {:.3E} {}% CI: ({:.3E},{:.3E})'.format(
+                            GTR[i], mean, (1 - alpha) * 100, low, high
+                        )
+                    )
                 for i in range(4):
-                    d = data[header.index('freqs.'+str(i+1))]
+                    d = data[header.index('freqs.' + str(i + 1))]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('  {} mean: {:.4f} {}% CI: ({:.4f},{:.4f})'.format(frequencies[i], mean, (1-alpha)*100, low, high))
+                    print(
+                        '  {} mean: {:.4f} {}% CI: ({:.4f},{:.4f})'.format(
+                            frequencies[i], mean, (1 - alpha) * 100, low, high
+                        )
+                    )
             elif var in variables:
                 if 'substrates.1' not in header or var != 'rate':
                     d = data[header.index(var)]
                     mean, median, low, high = descriptive_stats(d, alpha)
-                    print('{} mean: {} {}% CI: ({},{})'.format(variables[var], mean, (1-alpha)*100, low, high))
+                    print(
+                        '{} mean: {} {}% CI: ({},{})'.format(
+                            variables[var], mean, (1 - alpha) * 100, low, high
+                        )
+                    )
 
             # time tree
         if 'heights.1' in header:
@@ -293,7 +322,11 @@ def parse_log(inputfile, alpha=0.05, tree=None):
                     max_height = data[idx][0]
             d = data[index_root_height]
             mean, median, low, high = descriptive_stats(d, alpha)
-            print('Root height mean: {} {}% CI: ({},{})'.format(mean, (1-alpha)*100, low, high))
+            print(
+                'Root height mean: {} {}% CI: ({},{})'.format(
+                    mean, (1 - alpha) * 100, low, high
+                )
+            )
             if tree is not None and 'substrates.1' in header:
                 rindex = header.index('substrates.1')
                 hindex = header.index('heights.1')
@@ -315,12 +348,20 @@ def parse_log(inputfile, alpha=0.05, tree=None):
                             edge_length = n.parent_node.date - n.date
                             sum_distance += n.rate * edge_length
                             sum_time += edge_length
-                    d.append(sum_distance/sum_time)
+                    d.append(sum_distance / sum_time)
                     variances.append(numpy.var(rates))
                 mean, median, low, high = descriptive_stats(d, alpha)
-                print('Mean rate mean: {} {}% CI: ({},{})'.format(mean, (1 - alpha) * 100, low, high))
+                print(
+                    'Mean rate mean: {} {}% CI: ({},{})'.format(
+                        mean, (1 - alpha) * 100, low, high
+                    )
+                )
                 mean, median, low, high = descriptive_stats(variances, alpha)
-                print('Variance rate mean: {} {}% CI: ({},{})'.format(mean, (1 - alpha) * 100, low, high))
+                print(
+                    'Variance rate mean: {} {}% CI: ({},{})'.format(
+                        mean, (1 - alpha) * 100, low, high
+                    )
+                )
         else:
             indexes = []
             for idx, h in enumerate(header):
@@ -333,5 +374,8 @@ def parse_log(inputfile, alpha=0.05, tree=None):
                     sum_blens += data[idx][row]
                 sums.append(sum_blens)
             mean, median, low, high = descriptive_stats(sums, alpha)
-            print('Tree length mean: {} {}% CI: ({},{})'.format(mean, (1-alpha)*100, low, high))
-
+            print(
+                'Tree length mean: {} {}% CI: ({},{})'.format(
+                    mean, (1 - alpha) * 100, low, high
+                )
+            )
