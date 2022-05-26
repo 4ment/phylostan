@@ -40,9 +40,9 @@ def get_delta_rates():
 
 def get_rates_from_deltas():
     """
-	Create substrates from deltas and rate.
-	Used by MRF
-	"""
+    Create substrates from deltas and rate.
+    Used by MRF
+    """
     code_str = '''
 	{
 		// no rate at root and rate of first child has a different prior
@@ -62,12 +62,12 @@ def get_rates_from_deltas():
 
 def autocorrelated_prior(heterochronous):
     """
-	Thorne et al 1998
-	mu_i = log(r_a)
-	sigma_i = nu*t_i
+    Thorne et al 1998
+    mu_i = log(r_a)
+    sigma_i = nu*t_i
 
-	log(r_i) ~ N(mu_i, sigma_i^2)
-	"""
+    log(r_i) ~ N(mu_i, sigma_i^2)
+    """
     code_str = '''
 	real logn_autocorrelated_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
@@ -101,14 +101,14 @@ def autocorrelated_prior(heterochronous):
 
 def acln_prior(heterochronous):
     """
-	Kishino et al 2001 autocorrelated lognormal model
+    Kishino et al 2001 autocorrelated lognormal model
 
-	sigma_i = (nu*t_i)^1/2
-	E[r_i|r_a] = r_a = e^{mu_i + sigma_i^2/2}
-	mu_i = log(r_a) - nu*t_i/2
+    sigma_i = (nu*t_i)^1/2
+    E[r_i|r_a] = r_a = e^{mu_i + sigma_i^2/2}
+    mu_i = log(r_a) - nu*t_i/2
 
-	r_i ~ LN(mu_i, sigma_i)
-	"""
+    r_i ~ LN(mu_i, sigma_i)
+    """
     code_str = '''
 	real acln_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
@@ -142,16 +142,16 @@ def acln_prior(heterochronous):
 
 def acg_prior(heterochronous):
     """
-	Aris-Brosou and Yang 2002 autocorrelated gamma model
+    Aris-Brosou and Yang 2002 autocorrelated gamma model
 
-	E[r_i|r_a] = r_a = shape_i/rate_i
-	Var[r_i|r_a] = nu*t_i = shape_i/rate_i^2
+    E[r_i|r_a] = r_a = shape_i/rate_i
+    Var[r_i|r_a] = nu*t_i = shape_i/rate_i^2
 
-	shape_i = r_a^2/(nu*t_i)
-	rate_i = r_a/(nu*t_i)
+    shape_i = r_a^2/(nu*t_i)
+    rate_i = r_a/(nu*t_i)
 
-	r_i ~ Gamma(shape_i, rate_i)
-	"""
+    r_i ~ Gamma(shape_i, rate_i)
+    """
     code_str = '''
 	real acg_log(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
@@ -185,11 +185,11 @@ def acg_prior(heterochronous):
 
 def ace_prior():
     """
-	Aris-Brosou and Yang 2002 autocorrelated exponential model
-	E[r_i] = r_a
+    Aris-Brosou and Yang 2002 autocorrelated exponential model
+    E[r_i] = r_a
 
-	r_i ~ Exp(1/r_a)
-	"""
+    r_i ~ Exp(1/r_a)
+    """
     code_str = '''
 	real ace_log(real[] rates, int[,] map){
 		int nodeCount = size(rates) + 1;
@@ -211,9 +211,9 @@ def ace_prior():
 
 def aoup_prior(heterochronous):
     '''
-	Aris-Brous & Yang 2002 Ornstein-Uhlenbeck process
-	nu is sigma^2
-	'''
+    Aris-Brous & Yang 2002 Ornstein-Uhlenbeck process
+    nu is sigma^2
+    '''
     str = '''
 	real aoup_log(real[] rates, vector heights, int[,] map, real beta, real nu{0}){{
 		int S = rows(heights) + 1;
@@ -475,7 +475,7 @@ def transform_heights(heterochronous=False):
 		for( i in 2:nodeCount ){{
 			// internal node: transform
 			if(map[i,1] > S){{
-				heights[map[i,1]] = {1}(heights[map[i,2]]{2})*p[j];
+				heights[map[i,1]] = {1}(heights[map[i,2]]{2})*p[map[i,1]-S];
 				j += 1;
 			}}
 			else{{
@@ -724,6 +724,81 @@ one_on_X = """
 		return -log(x);
 	}
 """
+
+
+def likelihood_new(mixture, clock=True):
+    model_calculate_logP = """
+	for( n in 1:(S-1) ) {
+		p1 = peel[n,1];
+		p2 = peel[n,2];
+		p3 = peel[n,3] - S;
+		if(peel[n,1] <= S && peel[n,2] <= S){
+			for( i in 1:L ) {
+				partials[p3,i] = (pmats[p1]*tipdata[p1,i]) .* (pmats[p2]*tipdata[p2,i]);
+			}
+		}
+		else if(peel[n,1] <= S){
+			for( i in 1:L ) {
+				partials[p3,i] = (pmats[p1]*tipdata[p1,i]) .* (pmats[p2]*partials[p2-S,i]);
+			}
+		}
+		else if(peel[n,2] <= S){
+			for( i in 1:L ) {
+				partials[p3,i] = (pmats[p1]*partials[p1-S,i]) .* (pmats[p2]*tipdata[p2,i]);
+			}
+		}
+		else{
+			for( i in 1:L ) {
+				partials[p3,i] = (pmats[p1]*partials[p1-S,i]) .* (pmats[p2]*partials[p2-S,i]);
+			}		
+		}
+	}
+	p3 = peel[S-1,3] - S;
+	for( i in 1:L ) {
+		target += log(sum(partials[p3,i] .* freqs))*weights[i];
+	}
+	"""
+    model_calculate_mixture_logP = """
+    	for(c in 1:C){
+		for( n in 1:(S-1) ) {
+			p1 = peel[n,1];
+			p2 = peel[n,2];
+			p3 = peel[n,3] - S;
+			if(peel[n,1] <= S && peel[n,2] <= S){
+				for( i in 1:L ) {
+					partials[c,p3,i] = (pmats[p1+(c-1)*bcount]*tipdata[p1,i]) .* (pmats[p2+(c-1)*bcount]*tipdata[p2,i]);
+				}
+			}
+			else if(peel[n,1] <= S){
+				for( i in 1:L ) {
+					partials[c,p3,i] = (pmats[p1+(c-1)*bcount]*tipdata[p1,i]) .* (pmats[p2+(c-1)*bcount]*partials[c,p2-S,i]);
+				}
+			}
+			else if(peel[n,2] <= S){
+				for( i in 1:L ) {
+					partials[c,p3,i] = (pmats[p1+(c-1)*bcount]*partials[c,p1-S,i]) .* (pmats[p2+(c-1)*bcount]*tipdata[p2,i]);
+				}
+			}
+			else{
+				for( i in 1:L ) {
+					partials[c,p3,i] = (pmats[p1+(c-1)*bcount]*partials[c,p1-S,i]) .* (pmats[p2+(c-1)*bcount]*partials[c,p2-S,i]);
+				}		
+			}
+		}
+	}
+	p3 = peel[S-1,3] - S;
+	for( i in 1:L ) {
+		for(c in 1:C){
+			probs[c] = ps[c] * sum(partials[c,p3,i] .* freqs);
+		}
+		target += log(sum(probs))*weights[i];
+	}
+    """
+    model = '// calculate tree likelihood\n'
+    if not mixture:
+        return model + model_calculate_logP
+    else:
+        return model + model_calculate_mixture_logP
 
 
 def likelihood(mixture, clock=True):
@@ -987,16 +1062,27 @@ def get_model(params):
     if params.invariant or params.categories > 1:
         data_block.append('int C;')
         model_block_declarations.append('real probs[C];')
-        model_block_declarations.append(
-            'vector[4] partials[C,2*S,L];   // partial probabilities for the S tips and S-1 internal nodes'
-        )
+        if params.clock is not None:
+            model_block_declarations.append(
+                'vector[4] partials[C,S-1,L];   // partial probabilities for the S tips and S-1 internal nodes'
+            )
+        else:
+            model_block_declarations.append(
+                'vector[4] partials[C,2*S,L];   // partial probabilities for the S-1 internal nodes'
+            )
         model_block_declarations.append(
             'matrix[4,4] pmats[bcount*C]; // finite-time transition matrices for each branch'
         )
+
     else:
-        model_block_declarations.append(
-            'vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes'
-        )
+        if params.clock is not None:
+            model_block_declarations.append(
+                'vector[4] partials[S-1,L];   // partial probabilities for the S-1 internal nodes'
+            )
+        else:
+            model_block_declarations.append(
+                'vector[4] partials[2*S,L];   // partial probabilities for the S tips and S-1 internal nodes'
+            )
         model_block_declarations.append(
             'matrix[4,4] pmats[bcount]; // finite-time transition matrices for each branch'
         )
@@ -1293,10 +1379,20 @@ def get_model(params):
     else:
         raise ValueError('Supports JC69, HKY and GTR only.')
 
-        # Tree likelihood
-    model_block.append(
-        likelihood(params.categories > 1 or params.invariant, params.clock is not None)
-    )
+    # Tree likelihood
+    if params.clock is not None:
+        model_block_declarations.append(
+            """int p1;
+	int p2;
+	int p3;"""
+        )
+        model_block.append(likelihood_new(params.categories > 1 or params.invariant))
+    else:
+        model_block.append(
+            likelihood(
+                params.categories > 1 or params.invariant, params.clock is not None
+            )
+        )
 
     if params.clock is not None:
         model_block.append(jacobian(params.heterochronous))

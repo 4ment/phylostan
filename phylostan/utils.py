@@ -1,6 +1,35 @@
 import csv
 
-import numpy
+import numpy as np
+
+
+def ratios_root_height_from_branch_lengths(tree, eps=1.0e-6):
+    bounds = get_lowers(tree)
+    heights = heights_from_branch_lengths(tree, eps)
+    tip_count = len(tree.taxon_namespace)
+    ratios = [None] * (tip_count - 2)
+    for node in tree.preorder_node_iter(
+        lambda n: n != tree.seed_node and n.is_internal()
+    ):
+        ratios[node.index - 1 - tip_count] = (
+            heights[node.index - 1] - bounds[node.index - 1]
+        ) / (heights[node.parent_node.index - 1] - bounds[node.index - 1])
+    return np.array(ratios), np.array(heights[-1:])
+
+
+def heights_from_branch_lengths(tree, eps=1.0e-6):
+    heights = [None] * (2 * len(tree.taxon_namespace) - 1)
+    for node in tree.postorder_node_iter():
+        if node.is_leaf():
+            heights[node.index - 1] = node.date
+        else:
+            heights[node.index - 1] = max(
+                [
+                    heights[c.index - 1] + max(eps, c.edge_length)
+                    for c in node.child_node_iter()
+                ]
+            )
+    return heights
 
 
 def setup_dates(tree, dates=None, heterochronous=False):
@@ -90,7 +119,7 @@ def get_lowers(tree):
 
 
 def get_dna_leaves_partials(alignment):
-    tipdata = numpy.zeros((len(alignment), alignment.sequence_size, 4), dtype=numpy.int)
+    tipdata = np.zeros((len(alignment), alignment.sequence_size, 4), dtype=np.int)
     dna_map = {
         'a': [1, 0, 0, 0],
         'c': [0, 1, 0, 0],
@@ -128,7 +157,7 @@ def get_dna_leaves_partials_compressed(alignment):
         if keep[i]:
             weights.append(patterns[indexes[i]])
 
-    tipdata = numpy.zeros((len(alignment), len(patterns.keys()), 4), dtype=numpy.int)
+    tipdata = np.zeros((len(alignment), len(patterns.keys()), 4), dtype=np.int)
 
     dna_map = {
         'a': [1, 0, 0, 0],
@@ -253,8 +282,8 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
 
 
 def descriptive_stats(d, alpha):
-    median, low, high = numpy.quantile(d, (0.5, alpha / 2.0, 1.0 - alpha / 2.0))
-    return numpy.mean(d), median, low, high
+    median, low, high = np.quantile(d, (0.5, alpha / 2.0, 1.0 - alpha / 2.0))
+    return np.mean(d), median, low, high
 
 
 def parse_log(inputfile, alpha=0.05, tree=None):
@@ -349,7 +378,7 @@ def parse_log(inputfile, alpha=0.05, tree=None):
                             sum_distance += n.rate * edge_length
                             sum_time += edge_length
                     d.append(sum_distance / sum_time)
-                    variances.append(numpy.var(rates))
+                    variances.append(np.var(rates))
                 mean, median, low, high = descriptive_stats(d, alpha)
                 print(
                     'Mean rate mean: {} {}% CI: ({},{})'.format(

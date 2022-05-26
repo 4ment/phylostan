@@ -6,7 +6,7 @@ import pickle
 import sys
 
 import dendropy
-import numpy
+import numpy as np
 import pystan
 from dendropy import DnaCharacterMatrix, Tree
 
@@ -78,6 +78,11 @@ def create_run_parser(subprasers):
         type=argparse.FileType('r'),
         help="""Comma-separated (csv) file containing sequence dates with header
         'name,date'""",
+    )
+    parser.add_argument(
+        '--heights_init',
+        action="store_true",
+        help="""initialize node heights using input tree file""",
     )
 
     parser.add_argument(
@@ -530,7 +535,7 @@ def run(arg):
     if arg.clock is not None:
         if arg.coalescent == 'skygrid':
             data['G'] = arg.grid - 1
-            data['grid'] = numpy.linspace(0, arg.cutoff, arg.grid)[1:]
+            data['grid'] = np.linspace(0, arg.cutoff, arg.grid)[1:]
         elif arg.coalescent == 'skyride':
             # number of coalescent intervals
             data['I'] = sequence_count - 1
@@ -571,7 +576,19 @@ def run(arg):
             if len(row) > 0:
                 line = line.split(':')
                 inits[line[0].strip()] = list(map(float, line[1].split(',')))
-        stan_args['init'] = (inits,)
+        stan_args['init'] = inits
+    elif arg.heights_init or arg.rate is not None:
+        inits = {}
+        if arg.heights_init:
+            ratios, root_height = utils.ratios_root_height_from_branch_lengths(tree)
+            # ratios_unres = np.log(ratios / (1.0 - ratios))
+            # root_height_unres = np.log(root_height - data['lower_root'])
+            inits['props'] = ratios.tolist()  # ratios_unres.tolist()
+            inits['height'] = root_height.item() - data['lower_root']
+            inits['rate'] = arg.rate
+        elif arg.rate is not None:
+            inits['rate'] = arg.rate
+        stan_args['init'] = inits
 
     if arg.algorithm == 'LBFGS':
         fit = sm.optimizing(**stan_args)
