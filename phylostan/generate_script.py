@@ -1060,7 +1060,8 @@ def get_model(params):
 
     # Site model
     if params.invariant or params.categories > 1:
-        data_block.append('int C;')
+        if not params.invariant or params.categories > 1:
+            data_block.append('int C;')
         model_block_declarations.append('real probs[C];')
         if params.clock is not None:
             model_block_declarations.append(
@@ -1088,7 +1089,9 @@ def get_model(params):
         )
 
     if params.categories > 1 and params.heterogeneity == 'weibull':
-        transformed_data_declarations.append('vector[C] ps = rep_vector(1.0/C, C);')
+        transformed_parameters_declarations.append(
+            'vector[C] ps = rep_vector(1.0/C, C);'
+        )
 
         parameters_block.append('real<lower=0.1> wshape;')
         if params.invariant:

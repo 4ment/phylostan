@@ -5,7 +5,7 @@
 *phylostan* is a tool written in python for inferring phylogenetic trees from nucleotide datasets. 
 It generates a variety of phylogenetic models using the Stan language.
  Through the pystan library, *phylostan* has access to Stan's variational inference and sampling (NUTS and HMC) engines.
-The program has been described and its performance evaluated in a [preprint](https://doi.org/10.1101/702944). The data and scripts used to generate the results can be found [here](examples/README.md).
+The program has been described and its performance evaluated in an [article](https://doi.org/10.7717/peerj.8272). The data and scripts used to generate the results can be found [here](examples/README.md).
 
 ## Features
 Phylogenetic model components:
@@ -35,8 +35,8 @@ Algorithms provided by Stan:
 
 | Program/Library    | Version | Description |
 |----------- | --------| -- |
-| python | Tested on python 2.7, 3.5, 3.6, 3.7           | |
-| [pystan](https://pystan.readthedocs.io/)    | >=2.19 | API for [Stan](https://mc-stan.org) |
+| python | Tested on python 3.6, 3.7, 3.9           | |
+| [pystan](https://pystan.readthedocs.io/)    | >=2.19 <3 | API for [Stan](https://mc-stan.org) |
 | [dendropy](https://www.dendropy.org)      |   | Library for manipulating trees and alignments|
 | numpy   | >=1.7    | |
 
@@ -117,5 +117,18 @@ phylostan run -s fluA-GTR-W4.stan  -m HKY -C 4 \
 
 The NUTS algorithm is much slower (and more accurate) than variational inference so it should be used on a small dataset.
 
-## Reference
-Mathieu Fourment and Aaron E. Darling. Evaluating probabilistic programming and fast variational Bayesian inference in phylogenetics. _bioRxiv_. doi: [10.1101/702944](https://doi.org/10.1101/702944). 
+## Citing phylostan
+Mathieu Fourment and Aaron E. Darling. Evaluating Probabilistic Programming and Fast Variational Bayesian Inference in Phylogenetics. 2019 _PeerJ_. doi: [10.7717/peerj.8272](https://doi.org/10.7717/peerj.8272).
+
+```
+@article{fourment2019phylostan,
+  title    = "Evaluating probabilistic programming and fast variational
+              {B}ayesian inference in phylogenetics",
+  author   = "Fourment, Mathieu and Darling, Aaron E",
+  journal  = "PeerJ",
+  volume   =  7,
+  pages    = "e8272",
+  month    =  dec,
+  year     =  2019
+}
+```
