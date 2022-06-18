@@ -1,6 +1,6 @@
 def birth_death():
     code_str = '''
-	real birth_death_log(vector heights, int[,] map, real rho, real a, real r){
+	real birth_death_lpdf(vector heights, int[,] map, real rho, real a, real r){
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
 		real logP = 0;
@@ -69,7 +69,7 @@ def autocorrelated_prior(heterochronous):
     log(r_i) ~ N(mu_i, sigma_i^2)
     """
     code_str = '''
-	real logn_autocorrelated_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+	real logn_autocorrelated_lpdf(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
 		real logP = 0.0;
@@ -110,7 +110,7 @@ def acln_prior(heterochronous):
     r_i ~ LN(mu_i, sigma_i)
     """
     code_str = '''
-	real acln_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+	real acln_lpdf(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
 		real logP = 0.0;
@@ -153,7 +153,7 @@ def acg_prior(heterochronous):
     r_i ~ Gamma(shape_i, rate_i)
     """
     code_str = '''
-	real acg_log(real[] rates, vector heights, int[,] map, real nu{0}){{
+	real acg_lpdf(real[] rates, vector heights, int[,] map, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
 		real logP = 0.0;
@@ -191,7 +191,7 @@ def ace_prior():
     r_i ~ Exp(1/r_a)
     """
     code_str = '''
-	real ace_log(real[] rates, int[,] map){
+	real ace_lpdf(real[] rates, int[,] map){
 		int nodeCount = size(rates) + 1;
 		real logP = 0.0;
 		// no rate at root and rate of first child is exponentialy distributed
@@ -215,7 +215,7 @@ def aoup_prior(heterochronous):
     nu is sigma^2
     '''
     str = '''
-	real aoup_log(real[] rates, vector heights, int[,] map, real beta, real nu{0}){{
+	real aoup_lpdf(real[] rates, vector heights, int[,] map, real beta, real nu{0}){{
 		int S = rows(heights) + 1;
 		int nodeCount = S + rows(heights);
 		real logP = 0.0;
@@ -248,7 +248,7 @@ def aoup_prior(heterochronous):
 def ctmc_scale_prior():
     # Code adapted from https://github.com/beast-dev/beast-mcmc/blob/master/src/dr/evomodel/tree/CTMCScalePrior.java
     ctmc_scale = """
-	real ctmc_scale_log(real rate, vector blens){
+	real ctmc_scale_lpdf(real rate, vector blens){
 		real total_tree_time = sum(blens);
 		real log_normalization = 0.5 * log(total_tree_time) - 0.5723649263381958; //lgamma(0.5);
 		real log_like = log_normalization - 0.5 * log(rate) - rate * total_tree_time;
@@ -296,7 +296,7 @@ def get_weibull(invariant=False):
 
 def constant_coalescent():
     constant_coalescent_str = """
-	real constant_coalescent_log(vector heights, real popSize, int[,] map){
+	real constant_coalescent_lpdf(vector heights, real popSize, int[,] map){
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
 		int intervalCount = nodeCount - 1;
@@ -314,7 +314,7 @@ def constant_coalescent():
 
 def skyride_coalescent():
     skyride_coalescent_str = """
-	real skyride_coalescent_log(vector heights, vector logPopSize, int[,] map){
+	real skyride_coalescent_lpdf(vector heights, vector logPopSize, int[,] map){
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
 		int intervalCount = nodeCount - 1;
@@ -340,7 +340,7 @@ def skyride_coalescent():
 
 def skygrid_coalescent():
     skygrid_coalescent_str = """
-	real skygrid_coalescent_log(vector heights, vector logPopSize, int[,] map, vector grid){
+	real skygrid_coalescent_lpdf(vector heights, vector logPopSize, int[,] map, vector grid){
 		int G = rows(grid);
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
@@ -379,7 +379,7 @@ def skygrid_coalescent():
 def GMRF():
     gmrf_logP = """
 	// Not time aware
-	real gmrf_log(vector logPopSize, real precision){
+	real gmrf_lpdf(vector logPopSize, real precision){
 		int N = rows(logPopSize) - 1;
 		vector[N] logPopSizeDiff = logPopSize[2:] - logPopSize[:N];
 		return log(precision)*N/2.0 - (logPopSizeDiff' * logPopSizeDiff)*precision/2.0 - N/2.0 * log(2.0*pi());
@@ -391,7 +391,7 @@ def GMRF():
 def GMRF_time_aware():
     gmrf_logP = """
 	// Time aware (mid-point)
-	real gmrf_log(vector logPopSize, real precision, vector heights, int[,] map){
+	real gmrf_lpdf(vector logPopSize, real precision, vector heights, int[,] map){
 		int nodeCount = rows(heights);
 		int S = (nodeCount+1)/2;
 		int N = S - 1;
@@ -720,7 +720,7 @@ def P_matrix_function():
 
 
 one_on_X = """
-	real oneOnX_log(real x){
+	real oneOnX_lpdf(real x){
 		return -log(x);
 	}
 """

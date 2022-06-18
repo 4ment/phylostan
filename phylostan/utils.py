@@ -229,7 +229,7 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
                 if line.startswith('lp'):
                     header = line.split(',')
                     hindex = header.index('heights.1')
-                    if rate is None:
+                    if rate is not None:
                         strict = False
                         try:
                             rindex = header.index('substrates.1')
@@ -243,14 +243,15 @@ def convert_samples_to_nexus(tree, input, output, rate=None):
                     for n in tree.postorder_node_iter():
                         if not n.is_leaf():
                             n.date = float(l[hindex + n.index - taxaCount - 1])
-                    if strict:
-                        for n in tree.postorder_node_iter():
-                            if n.parent_node is not None:
-                                n.rate = float(l[rindex]) if rate is None else rate
-                    else:
-                        for n in tree.postorder_node_iter():
-                            if n.parent_node is not None:
-                                n.rate = float(l[rindex + n.index - 1])
+                    if rate is not None:
+                        if strict:
+                            for n in tree.postorder_node_iter():
+                                if n.parent_node is not None:
+                                    n.rate = float(l[rindex]) if rate is None else rate
+                        else:
+                            for n in tree.postorder_node_iter():
+                                if n.parent_node is not None:
+                                    n.rate = float(l[rindex + n.index - 1])
 
                     for n in tree.postorder_node_iter():
                         if n.parent_node is not None:
