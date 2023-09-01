@@ -250,7 +250,7 @@ def create_build_parser(subprasers, prog, help):
     parser.add_argument(
         '-c',
         '--coalescent',
-        choices=['constant', 'skyride', 'skygrid'],
+        choices=['constant', 'skyride', 'skygrid', 'skyglide'],
         default=None,
         help="""Type of coalescent (constant or skyride)""",
     )
@@ -265,20 +265,20 @@ def create_build_parser(subprasers, prog, help):
         metavar='I',
         required=False,
         type=int,
-        help="""Number of grid points in skygrid""",
+        help="""Number of grid points in skygrid or skyglide""",
     )
     parser.add_argument(
         '--cutoff',
         metavar='G',
         required=False,
         type=float,
-        help="""a cutoff for skygrid""",
+        help="""a cutoff for skygrid and skyglide""",
     )
     parser.add_argument(
         '--non_centered',
         action="store_true",
         help="""Use non centered parameterization for population size parameters
-        (skygrid only)""",
+        (skygrid and skyglide only)""",
     )
     parser.add_argument(
         '--time_aware',
@@ -533,7 +533,7 @@ def run(arg):
             data['C'] += 1
 
     if arg.clock is not None:
-        if arg.coalescent == 'skygrid':
+        if arg.coalescent in ('skygrid', 'skyglide'):
             data['G'] = arg.grid - 1
             data['grid'] = np.linspace(0, arg.cutoff, arg.grid)[1:]
         elif arg.coalescent == 'skyride':

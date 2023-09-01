@@ -376,6 +376,85 @@ def skygrid_coalescent():
     return skygrid_coalescent_str
 
 
+def skyglide_coalescent():
+    skyglide_coalescent_str = """
+	real skyglide_coalescent_lpdf(vector heights, vector logGridPopSize, int[,] map, vector grid){
+		int G = rows(grid);
+		int nodeCount = rows(heights);
+		int S = (nodeCount+1)/2;
+		int intervalCount = nodeCount - 1 + G;
+        int K = G + 1; // number of parameters
+
+		real logP = 0.0;
+        real t = 0;
+        real popSize;
+
+        int currentGridIndex = 1;
+        vector[K] gridPopSize = exp(logGridPopSize);
+		real popSizeGridStart = gridPopSize[1];
+		real popSizeGridEnd = gridPopSize[2];
+		real timeGridStart = 0;
+		real timeGridEnd = grid[1];
+		real popSizeCurrent = popSizeGridStart;
+
+		vector[nodeCount+G] events = rep_vector(0, nodeCount+G);
+		vector[nodeCount+G] times = append_row(heights, grid);
+		int indices[nodeCount+G] = sort_indices_asc(times);
+		vector[intervalCount] intervals = times[indices][2:] - times[indices][:intervalCount];
+		vector[intervalCount] lineageCount;
+        vector[intervalCount] lchoose2;
+
+		events[:nodeCount] = append_row(rep_vector(1, S), rep_vector(-1, S-1));
+		lineageCount = cumulative_sum(events[indices])[:intervalCount];
+        lchoose2 = ((lineageCount .* (lineageCount-1.0))/2.0);
+
+		for( i in 1:intervalCount ){
+			if(intervals[i] == 0.0){
+				continue;
+			}
+            t += intervals[i];
+
+			if (events[indices[i+ 1]] != 0){
+				// use piecewise constant after last grid point
+				if(currentGridIndex >= K){
+					popSize = popSizeGridEnd;
+				}
+				else{
+					popSize = popSizeGridStart + (popSizeGridEnd - popSizeGridStart) * (t - timeGridStart)/(timeGridEnd - timeGridStart);
+				}
+				if(events[indices[i+ 1]] == -1){
+					logP -= log(popSize);
+				}
+			}
+			else{
+				popSize = popSizeGridEnd;
+			}
+
+            if (currentGridIndex < K){
+				logP -= lchoose2[i] * intervals[i] * (log(popSize) - log(popSizeCurrent))/(popSize - popSizeCurrent);
+			}
+			else{
+				logP -= lchoose2[i] * intervals[i] / popSize;
+			}
+
+			popSizeCurrent = popSize;
+
+			if (events[indices[i+ 1]] == 0) {
+				currentGridIndex += 1;
+				if(currentGridIndex < K){
+					timeGridStart = timeGridEnd;
+					timeGridEnd = grid[currentGridIndex];
+					popSizeGridStart = popSizeGridEnd;
+					popSizeGridEnd = gridPopSize[currentGridIndex+1];
+				}
+			}
+		}
+		return logP;
+	}
+"""
+    return skyglide_coalescent_str
+
+
 def GMRF():
     gmrf_logP = """
 	// Not time aware
@@ -1290,8 +1369,11 @@ def get_model(params):
             else:
                 model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
             model_priors.append('tau ~ gamma(0.001, 0.001);')
-        elif params.coalescent == 'skygrid':
-            functions_block.append(skygrid_coalescent())
+        elif params.coalescent in ('skygrid', 'skyglide'):
+            if params.coalescent == 'skygrid':
+                functions_block.append(skygrid_coalescent())
+            elif params.coalescent == 'skyglide':
+                functions_block.append(skyglide_coalescent())
 
             data_block.append('int G; // number of grid interval')
             data_block.append('vector<lower=0>[G] grid;')
@@ -1316,7 +1398,11 @@ def get_model(params):
                 )
                 model_priors.append('deltaThetas ~ normal(0.0, 1.0/sqrt(tau));')
 
-            model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
+            if params.coalescent == 'skygrid':
+                model_priors.append('heights ~ skygrid_coalescent(thetas, map, grid);')
+            elif params.coalescent == 'skyglide':
+                model_priors.append('heights ~ skyglide_coalescent(thetas, map, grid);')
+
             model_priors.append('tau ~ gamma(0.001, 0.001);')
     else:
         parameters_block.append('vector<lower=0> [bcount] blens; // branch lengths')
