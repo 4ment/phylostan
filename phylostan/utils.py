@@ -119,7 +119,7 @@ def get_lowers(tree):
 
 
 def get_dna_leaves_partials(alignment):
-    tipdata = np.zeros((len(alignment), alignment.sequence_size, 4), dtype=np.int)
+    tipdata = np.zeros((len(alignment), alignment.sequence_size, 4), dtype=int)
     dna_map = {
         'a': [1, 0, 0, 0],
         'c': [0, 1, 0, 0],
@@ -157,7 +157,7 @@ def get_dna_leaves_partials_compressed(alignment):
         if keep[i]:
             weights.append(patterns[indexes[i]])
 
-    tipdata = np.zeros((len(alignment), len(patterns.keys()), 4), dtype=np.int)
+    tipdata = np.zeros((len(alignment), len(patterns.keys()), 4), dtype=int)
 
     dna_map = {
         'a': [1, 0, 0, 0],

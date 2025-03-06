@@ -352,11 +352,15 @@ def main():
     )
     compile_parser.set_defaults(func=compile_script)
 
-    arg = parser.parse_args()
-    try:
-        arg.func(arg)
-    except AttributeError:
+    # Set default function to show help if no subcommand is used
+    def show_help(arg):
         parser.print_help()
+        sys.exit(1)
+
+    parser.set_defaults(func=show_help)
+
+    arg = parser.parse_args()
+    arg.func(arg)
 
 
 def parse_logs(treeobj, treelog, samplelog, rate, alpha):
